@@ -1,0 +1,7 @@
+database.name=demo
+tumblr.username=test
+tumblr.blogname=test
+tumblr.key=key
+tumblr.secret=secret
+tumblr.oauthtoken=token
+tumblr.oauthpass=pass
