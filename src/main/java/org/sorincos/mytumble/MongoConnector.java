@@ -29,7 +29,7 @@ public class MongoConnector extends AbstractVerticle {
 
 		// and listen for messages
 		// TODO can be blocking?
-		vertx.eventBus().consumer("mytumblr.mongo.findall", message -> {
+		vertx.eventBus().consumer("mytumble.mongo.findall", message -> {
 			mongo.find("users", new JsonObject(), lookup -> {
 			  final JsonArray json = new JsonArray();
 

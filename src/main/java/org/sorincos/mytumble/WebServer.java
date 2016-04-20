@@ -26,7 +26,7 @@ public class WebServer extends AbstractVerticle {
 
 		// define some REST API
 		router.get("/api/users").handler(ctx -> {
-			vertx.eventBus().send("mytumblr.mongo.findall", new JsonObject(), new Handler<AsyncResult<Message<JsonArray>>>() {
+			vertx.eventBus().send("mytumble.mongo.findall", new JsonObject(), new Handler<AsyncResult<Message<JsonArray>>>() {
 			  @Override
 			  public void handle(AsyncResult<Message<JsonArray>> result) {
 				  if (result.failed()) {
@@ -43,7 +43,7 @@ public class WebServer extends AbstractVerticle {
 		});
 
 		router.get("/api/users/:id").handler(ctx -> {
-			vertx.eventBus().send("mytumblr.mongo.findone", new JsonObject().put("_id", ctx.request().getParam("id")),
+			vertx.eventBus().send("mytumble.mongo.findone", new JsonObject().put("_id", ctx.request().getParam("id")),
 		      new Handler<AsyncResult<Message<JsonArray>>>() {
 
 			      @Override
@@ -71,7 +71,7 @@ public class WebServer extends AbstractVerticle {
 				ctx.fail(400);
 				return;
 			}
-			vertx.eventBus().send("mytumblr.mongo.findone", new JsonObject().put("username", newUser.getString("username")),
+			vertx.eventBus().send("mytumble.mongo.findone", new JsonObject().put("username", newUser.getString("username")),
 		      new Handler<AsyncResult<Message<JsonArray>>>() {
 			      @Override
 			      public void handle(AsyncResult<Message<JsonArray>> result) {
@@ -85,7 +85,7 @@ public class WebServer extends AbstractVerticle {
 					      ctx.fail(500);
 					      return;
 				      }
-				      vertx.eventBus().send("mytumblr.mongo.insert", user, new Handler<AsyncResult<Message<JsonArray>>>() {
+				      vertx.eventBus().send("mytumble.mongo.insert", user, new Handler<AsyncResult<Message<JsonArray>>>() {
 			          @Override
 			          public void handle(AsyncResult<Message<JsonArray>> insert) {
 				          if (insert.failed()) {
