@@ -147,7 +147,7 @@ public class TumblrConnector extends AbstractVerticle {
 		Map<String, String> options = new HashMap<String, String>();
 		options.put("offset", Integer.toString(0));
 		List<User> followers = myBlog.followers(options);
-		for (Integer offset = 20; offset < 41; offset += 20) {
+		for (Integer offset = 20; offset < numFollowers; offset += 20) {
 			System.out.println(offset + "...");
 			options.put("offset", Integer.toString(offset));
 			followers.addAll(myBlog.followers(options));
@@ -162,8 +162,8 @@ public class TumblrConnector extends AbstractVerticle {
 			JsonObject jsonFollower = new JsonObject();
 			jsonFollower.put("name", follower.getName());
 			jsonFollower.put("is_followed", follower.isFollowing());
-			// String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
-			// jsonFollower.put("avatar", avatar);
+			String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
+			jsonFollower.put("avatar", avatar);
 			jsonFollowers.add(jsonFollower);
 		}
 		return jsonFollowers;
