@@ -24,7 +24,40 @@ public class WebServer extends AbstractVerticle {
 		Router router = Router.router(vertx);
 		router.route().handler(BodyHandler.create());
 
-		// define some REST API
+		router.get("/api/followers").handler(ctx -> {
+			vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, new Handler<AsyncResult<Message<JsonArray>>>() {
+			  @Override
+			  public void handle(AsyncResult<Message<JsonArray>> result) {
+				  if (result.failed()) {
+					  ctx.fail(500);
+					  return;
+				  }
+				  // TODO how about saving to DB directly here?
+				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+				  ctx.response().end(result.result().body().encode());
+				  return;
+			  }
+		  });
+		});
+
+		router.get("/api/posts").handler(ctx -> {
+			vertx.eventBus().send("mytumble.tumblr.loadposts", null, new Handler<AsyncResult<Message<JsonArray>>>() {
+			  @Override
+			  public void handle(AsyncResult<Message<JsonArray>> result) {
+				  System.out.println("returning");
+				  if (result.failed()) {
+					  ctx.fail(500);
+					  return;
+				  }
+				  System.out.println("returning");
+				  // TODO how about saving to DB directly here?
+				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+				  ctx.response().end(result.result().body().encode());
+				  return;
+			  }
+		  });
+		});
+
 		router.get("/api/users").handler(ctx -> {
 			vertx.eventBus().send("mytumble.mongo.findall", new JsonObject(), new Handler<AsyncResult<Message<JsonArray>>>() {
 			  @Override
@@ -64,9 +97,7 @@ public class WebServer extends AbstractVerticle {
 		});
 
 		router.post("/api/users").handler(ctx -> {
-
 			JsonObject newUser = ctx.getBodyAsJson();
-
 			if (null == newUser) {
 				ctx.fail(400);
 				return;

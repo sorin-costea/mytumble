@@ -77,13 +77,11 @@ public class TumblrConnector extends AbstractVerticle {
 
 		EventBus eb = vertx.eventBus();
 
-		MessageConsumer<JsonArray> loadConsumer = eb.consumer("mytumble.tumblr.loadfollowers");
-		loadConsumer.handler(message -> loadFollowers(client));
+		MessageConsumer<JsonArray> consumerFollowers = eb.consumer("mytumble.tumblr.loadfollowers");
+		consumerFollowers.handler(message -> loadFollowers(client));
 
-		MessageConsumer<JsonArray> loadPosts = eb.consumer("mytumble.tumblr.loadposts");
-		loadPosts.handler(message -> loadPosts(client));
-
-		loadPosts(client);
+		MessageConsumer<JsonArray> consumerPosts = eb.consumer("mytumble.tumblr.loadposts");
+		consumerPosts.handler(message -> loadPosts(client));
 	}
 
 	private JsonArray loadPosts(JumblrClient client) {
@@ -98,12 +96,18 @@ public class TumblrConnector extends AbstractVerticle {
 			System.out.println("Error: Blog name not found - " + blogname);
 			return new JsonArray();
 		}
+		System.out.println("Posts for " + blogname);
 		Map<String, Object> params = new HashMap<String, Object>();
 		params.put("notes_info", true);
 		params.put("reblog_info", true);
 		List<Post> posts = myBlog.posts(params);
 		JsonArray jsonPosts = new JsonArray();
+		int count = 0;
 		for (Post post : posts) {
+			System.out.println(count);
+			if (++count % 50 == 0) {
+				System.out.println(count);
+			}
 			JsonObject jsonPost = new JsonObject();
 			jsonPost.put("timestamp", post.getTimestamp());
 			if (null != post.getRebloggedFromName()) {
@@ -111,6 +115,7 @@ public class TumblrConnector extends AbstractVerticle {
 			}
 			JsonArray jsonNotes = new JsonArray();
 			for (Note note : post.getNotes()) {
+				System.out.println("- " + post.getNoteCount());
 				JsonObject jsonNote = new JsonObject();
 				jsonNote.put("name", note.getBlogName());
 				jsonNote.put("timestamp", note.getTimestamp());
@@ -120,6 +125,7 @@ public class TumblrConnector extends AbstractVerticle {
 			jsonPost.put("notes", jsonNotes);
 			jsonPosts.add(jsonPost);
 		}
+		System.out.println("bye");
 		return jsonPosts;
 	}
 
@@ -141,17 +147,23 @@ public class TumblrConnector extends AbstractVerticle {
 		Map<String, String> options = new HashMap<String, String>();
 		options.put("offset", Integer.toString(0));
 		List<User> followers = myBlog.followers(options);
-		for (Integer offset = 20; offset < numFollowers; offset += 20) {
+		for (Integer offset = 20; offset < 41; offset += 20) {
+			System.out.println(offset + "...");
 			options.put("offset", Integer.toString(offset));
 			followers.addAll(myBlog.followers(options));
 		}
+		System.out.println("About followers: ");
 		JsonArray jsonFollowers = new JsonArray();
+		int count = 0;
 		for (User follower : followers) {
+			if (++count % 50 == 0) {
+				System.out.println(count);
+			}
 			JsonObject jsonFollower = new JsonObject();
 			jsonFollower.put("name", follower.getName());
 			jsonFollower.put("is_followed", follower.isFollowing());
-			String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
-			jsonFollower.put("avatar", avatar);
+			// String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
+			// jsonFollower.put("avatar", avatar);
 			jsonFollowers.add(jsonFollower);
 		}
 		return jsonFollowers;
