@@ -44,12 +44,10 @@ public class WebServer extends AbstractVerticle {
 			vertx.eventBus().send("mytumble.tumblr.loadposts", null, new Handler<AsyncResult<Message<JsonArray>>>() {
 			  @Override
 			  public void handle(AsyncResult<Message<JsonArray>> result) {
-				  System.out.println("returning");
 				  if (result.failed()) {
 					  ctx.fail(500);
 					  return;
 				  }
-				  System.out.println("returning");
 				  // TODO how about saving to DB directly here?
 				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
 				  ctx.response().end(result.result().body().encode());

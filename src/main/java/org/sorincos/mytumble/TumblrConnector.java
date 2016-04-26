@@ -15,7 +15,7 @@ import com.tumblr.jumblr.types.User;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.eventbus.MessageConsumer;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
@@ -76,96 +76,117 @@ public class TumblrConnector extends AbstractVerticle {
 		client.setToken(oauthtoken, oauthpass);
 
 		EventBus eb = vertx.eventBus();
+		vertx.getOrCreateContext().put("jumblrclient", client);
 
-		MessageConsumer<JsonArray> consumerFollowers = eb.consumer("mytumble.tumblr.loadfollowers");
-		consumerFollowers.handler(message -> loadFollowers(client));
+		eb.<JsonArray>consumer("mytumble.tumblr.loadfollowers").handler(this::loadFollowers);
 
-		MessageConsumer<JsonArray> consumerPosts = eb.consumer("mytumble.tumblr.loadposts");
-		consumerPosts.handler(message -> loadPosts(client));
+		eb.<JsonArray>consumer("mytumble.tumblr.loadposts").handler(this::loadPosts);
+
 	}
 
-	private JsonArray loadPosts(JumblrClient client) {
-		Blog myBlog = null;
-		for (Blog blog : client.user().getBlogs()) {
-			if (0 == blog.getName().compareTo(blogname)) {
-				myBlog = blog;
-				break;
+	private void loadPosts(Message<JsonArray> msg) {
+		vertx.<JsonArray>executeBlocking(future -> {
+			JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
+			Blog myBlog = null;
+			for (Blog blog : client.user().getBlogs()) {
+				if (0 == blog.getName().compareTo(blogname)) {
+					myBlog = blog;
+					break;
+				}
 			}
-		}
-		if (null == myBlog) {
-			System.out.println("Error: Blog name not found - " + blogname);
-			return new JsonArray();
-		}
-		System.out.println("Posts for " + blogname);
-		Map<String, Object> params = new HashMap<String, Object>();
-		params.put("notes_info", true);
-		params.put("reblog_info", true);
-		List<Post> posts = myBlog.posts(params);
-		JsonArray jsonPosts = new JsonArray();
-		int count = 0;
-		for (Post post : posts) {
-			System.out.println(count);
-			if (++count % 50 == 0) {
+			if (null == myBlog) {
+				System.out.println("Error: Blog name not found - " + blogname);
+				future.fail("Error: Blog name not found - " + blogname);
+			}
+			System.out.println("Posts for " + blogname);
+			Map<String, Object> params = new HashMap<String, Object>();
+			params.put("notes_info", true);
+			params.put("reblog_info", true);
+			List<Post> posts = myBlog.posts(params);
+			JsonArray jsonPosts = new JsonArray();
+			int count = 0;
+			for (Post post : posts) {
+				// TODO how not to kill Tumblr with requests??
 				System.out.println(count);
+				if (++count > 5) {
+					break;
+				}
+				JsonObject jsonPost = new JsonObject();
+				jsonPost.put("timestamp", post.getTimestamp());
+				if (null != post.getRebloggedFromName()) {
+					continue; // don't care about what I reblogged
+				}
+				JsonArray jsonNotes = new JsonArray();
+				for (Note note : post.getNotes()) {
+					System.out.println("- " + post.getNoteCount() + "/" + note.getBlogName());
+					JsonObject jsonNote = new JsonObject();
+					jsonNote.put("name", note.getBlogName());
+					jsonNote.put("timestamp", note.getTimestamp());
+					jsonNote.put("type", note.getType());
+					jsonNotes.add(jsonNote);
+				}
+				jsonPost.put("notes", jsonNotes);
+				jsonPosts.add(jsonPost);
 			}
-			JsonObject jsonPost = new JsonObject();
-			jsonPost.put("timestamp", post.getTimestamp());
-			if (null != post.getRebloggedFromName()) {
-				continue; // don't care about what I reblogged
+			future.complete(jsonPosts);
+		}, result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().toString());
 			}
-			JsonArray jsonNotes = new JsonArray();
-			for (Note note : post.getNotes()) {
-				System.out.println("- " + post.getNoteCount());
-				JsonObject jsonNote = new JsonObject();
-				jsonNote.put("name", note.getBlogName());
-				jsonNote.put("timestamp", note.getTimestamp());
-				jsonNote.put("type", note.getType());
-				jsonNotes.add(jsonNote);
-			}
-			jsonPost.put("notes", jsonNotes);
-			jsonPosts.add(jsonPost);
-		}
-		System.out.println("bye");
-		return jsonPosts;
+		});
 	}
 
-	private JsonArray loadFollowers(JumblrClient client) {
-		Blog myBlog = null;
-		for (Blog blog : client.user().getBlogs()) {
-			if (0 == blog.getName().compareTo(blogname)) {
-				myBlog = blog;
-				break;
+	private void loadFollowers(Message<JsonArray> msg) {
+		vertx.<JsonArray>executeBlocking(future -> {
+			Blog myBlog = null;
+			JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
+			for (Blog blog : client.user().getBlogs()) {
+				if (0 == blog.getName().compareTo(blogname)) {
+					myBlog = blog;
+					break;
+				}
 			}
-		}
-		if (null == myBlog) {
-			System.out.println("Error: Blog name not found - " + blogname);
-			return new JsonArray();
-		}
-		int numFollowers = myBlog.getFollowersCount();
-		System.out.println("Followers: " + numFollowers);
+			if (null == myBlog) {
+				System.out.println("Error: Blog name not found - " + blogname);
+				future.fail("Error: Blog name not found - " + blogname);
+			}
+			int numFollowers = myBlog.getFollowersCount();
+			System.out.println("Followers: " + numFollowers);
 
-		Map<String, String> options = new HashMap<String, String>();
-		options.put("offset", Integer.toString(0));
-		List<User> followers = myBlog.followers(options);
-		for (Integer offset = 20; offset < numFollowers; offset += 20) {
-			System.out.println(offset + "...");
-			options.put("offset", Integer.toString(offset));
-			followers.addAll(myBlog.followers(options));
-		}
-		System.out.println("About followers: ");
-		JsonArray jsonFollowers = new JsonArray();
-		int count = 0;
-		for (User follower : followers) {
-			if (++count % 50 == 0) {
-				System.out.println(count);
+			Map<String, String> options = new HashMap<String, String>();
+			options.put("offset", Integer.toString(0));
+			List<User> followers = myBlog.followers(options);
+			for (Integer offset = 20; offset < numFollowers; offset += 20) {
+				System.out.println(offset + "...");
+				options.put("offset", Integer.toString(offset));
+				followers.addAll(myBlog.followers(options));
 			}
-			JsonObject jsonFollower = new JsonObject();
-			jsonFollower.put("name", follower.getName());
-			jsonFollower.put("is_followed", follower.isFollowing());
-			String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
-			jsonFollower.put("avatar", avatar);
-			jsonFollowers.add(jsonFollower);
-		}
-		return jsonFollowers;
+			System.out.println("About followers: ");
+			JsonArray jsonFollowers = new JsonArray();
+			int count = 0;
+			for (User follower : followers) {
+				// TODO how not to kill Tumblr with requests??
+				if (++count % 50 == 0) {
+					System.out.println(count);
+				}
+				JsonObject jsonFollower = new JsonObject();
+				jsonFollower.put("name", follower.getName());
+				jsonFollower.put("is_followed", follower.isFollowing());
+				String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
+				jsonFollower.put("avatar", avatar);
+				jsonFollowers.add(jsonFollower);
+			}
+			future.complete(jsonFollowers);
+		}, result -> {
+			if (result.succeeded()) {
+				System.out.println("Success posts");
+				msg.reply(result.result());
+			} else {
+				System.out.println("Fail posts");
+				msg.fail(1, result.cause().toString());
+			}
+		});
 	}
 }
