@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +24,8 @@ import io.vertx.core.json.JsonObject;
 @Component
 @ConfigurationProperties(prefix = "tumblr")
 public class TumblrConnector extends AbstractVerticle {
+
+	static final Logger logger = LoggerFactory.getLogger(TumblrConnector.class);
 
 	private String key;
 	private String secret;
@@ -82,11 +86,29 @@ public class TumblrConnector extends AbstractVerticle {
 
 		eb.<JsonArray>consumer("mytumble.tumblr.loadposts").handler(this::loadPosts);
 
+		eb.<String>consumer("mytumble.tumblr.test").handler(this::test);
+
+	}
+
+	private void test(Message<String> msg) {
+		vertx.<String>executeBlocking(future -> {
+			future.complete("Yay!");
+		}, result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().toString());
+			}
+		});
 	}
 
 	private void loadPosts(Message<JsonArray> msg) {
 		vertx.<JsonArray>executeBlocking(future -> {
+			logger.info("Posts for " + blogname);
 			JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
+			if (null == client) {
+				future.fail("Error: Jumblr not initialized");
+			}
 			Blog myBlog = null;
 			for (Blog blog : client.user().getBlogs()) {
 				if (0 == blog.getName().compareTo(blogname)) {
@@ -95,10 +117,8 @@ public class TumblrConnector extends AbstractVerticle {
 				}
 			}
 			if (null == myBlog) {
-				System.out.println("Error: Blog name not found - " + blogname);
 				future.fail("Error: Blog name not found - " + blogname);
 			}
-			System.out.println("Posts for " + blogname);
 			Map<String, Object> params = new HashMap<String, Object>();
 			params.put("notes_info", true);
 			params.put("reblog_info", true);
@@ -106,9 +126,8 @@ public class TumblrConnector extends AbstractVerticle {
 			JsonArray jsonPosts = new JsonArray();
 			int count = 0;
 			for (Post post : posts) {
-				// TODO how not to kill Tumblr with requests??
-				System.out.println(count);
-				if (++count > 5) {
+				logger.info("Post #" + count);
+				if (++count > 5) { // TODO better use a timestamp on latest activity
 					break;
 				}
 				JsonObject jsonPost = new JsonObject();
@@ -118,7 +137,7 @@ public class TumblrConnector extends AbstractVerticle {
 				}
 				JsonArray jsonNotes = new JsonArray();
 				for (Note note : post.getNotes()) {
-					System.out.println("- " + post.getNoteCount() + "/" + note.getBlogName());
+					logger.info("- " + post.getNoteCount() + "/" + note.getBlogName());
 					JsonObject jsonNote = new JsonObject();
 					jsonNote.put("name", note.getBlogName());
 					jsonNote.put("timestamp", note.getTimestamp());
@@ -149,27 +168,24 @@ public class TumblrConnector extends AbstractVerticle {
 				}
 			}
 			if (null == myBlog) {
-				System.out.println("Error: Blog name not found - " + blogname);
 				future.fail("Error: Blog name not found - " + blogname);
 			}
 			int numFollowers = myBlog.getFollowersCount();
-			System.out.println("Followers: " + numFollowers);
+			logger.info("Followers: " + numFollowers);
 
 			Map<String, String> options = new HashMap<String, String>();
 			options.put("offset", Integer.toString(0));
 			List<User> followers = myBlog.followers(options);
 			for (Integer offset = 20; offset < numFollowers; offset += 20) {
-				System.out.println(offset + "...");
+				logger.info(offset + "...");
 				options.put("offset", Integer.toString(offset));
 				followers.addAll(myBlog.followers(options));
 			}
-			System.out.println("About followers: ");
 			JsonArray jsonFollowers = new JsonArray();
 			int count = 0;
 			for (User follower : followers) {
-				// TODO how not to kill Tumblr with requests??
 				if (++count % 50 == 0) {
-					System.out.println(count);
+					logger.info("%s", count);
 				}
 				JsonObject jsonFollower = new JsonObject();
 				jsonFollower.put("name", follower.getName());
@@ -181,10 +197,8 @@ public class TumblrConnector extends AbstractVerticle {
 			future.complete(jsonFollowers);
 		}, result -> {
 			if (result.succeeded()) {
-				System.out.println("Success posts");
 				msg.reply(result.result());
 			} else {
-				System.out.println("Fail posts");
 				msg.fail(1, result.cause().toString());
 			}
 		});

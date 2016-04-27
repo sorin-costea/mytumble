@@ -1,5 +1,7 @@
 package org.sorincos.mytumble;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -18,13 +20,32 @@ import io.vertx.ext.web.handler.StaticHandler;
 @ConfigurationProperties(prefix = "web")
 public class WebServer extends AbstractVerticle {
 
+	static final Logger logger = LoggerFactory.getLogger(WebServer.class);
+
 	@Override
 	public void start() throws Exception {
 
 		Router router = Router.router(vertx);
 		router.route().handler(BodyHandler.create());
 
+		router.get("/api/test").handler(ctx -> {
+			logger.info("Test");
+			vertx.eventBus().send("mytumble.tumblr.test", null, new Handler<AsyncResult<Message<String>>>() {
+			  @Override
+			  public void handle(AsyncResult<Message<String>> result) {
+				  if (result.failed()) {
+					  ctx.fail(500);
+					  return;
+				  }
+				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+				  ctx.response().end(result.result().body());
+				  return;
+			  }
+		  });
+		});
+
 		router.get("/api/followers").handler(ctx -> {
+			logger.info("Get followers");
 			vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, new Handler<AsyncResult<Message<JsonArray>>>() {
 			  @Override
 			  public void handle(AsyncResult<Message<JsonArray>> result) {
@@ -41,6 +62,7 @@ public class WebServer extends AbstractVerticle {
 		});
 
 		router.get("/api/posts").handler(ctx -> {
+			logger.info("Get posts");
 			vertx.eventBus().send("mytumble.tumblr.loadposts", null, new Handler<AsyncResult<Message<JsonArray>>>() {
 			  @Override
 			  public void handle(AsyncResult<Message<JsonArray>> result) {

@@ -3,6 +3,8 @@ package org.sorincos.mytumble;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +16,8 @@ import io.vertx.ext.mongo.MongoClient;
 @Component
 @ConfigurationProperties(prefix = "database")
 public class MongoConnector extends AbstractVerticle {
+	static final Logger logger = LoggerFactory.getLogger(MongoConnector.class);
+
 	private String name;
 
 	private MongoClient mongo;
@@ -66,7 +70,7 @@ public class MongoConnector extends AbstractVerticle {
 
 			for (JsonObject user : users) {
 				db.insert("users", user, res -> {
-			    System.out.println("inserted " + user.encode());
+			    logger.info("inserted " + user.encode());
 		    });
 			}
 		});
