@@ -34,7 +34,7 @@ public class WebServer extends AbstractVerticle {
 			  @Override
 			  public void handle(AsyncResult<Message<String>> result) {
 				  if (result.failed()) {
-					  ctx.fail(500);
+					  ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
 					  return;
 				  }
 				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
@@ -50,7 +50,7 @@ public class WebServer extends AbstractVerticle {
 			  @Override
 			  public void handle(AsyncResult<Message<JsonArray>> result) {
 				  if (result.failed()) {
-					  ctx.fail(500);
+					  ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
 					  return;
 				  }
 				  // TODO how about saving to DB directly here?
@@ -63,11 +63,15 @@ public class WebServer extends AbstractVerticle {
 
 		router.get("/api/posts").handler(ctx -> {
 			logger.info("Get posts");
-			vertx.eventBus().send("mytumble.tumblr.loadposts", null, new Handler<AsyncResult<Message<JsonArray>>>() {
+			JsonArray params = new JsonArray();
+			params.add(5);
+			// instead of the JsonArray trick one could write a custom MessageCodec
+		  // allowing to send an integer and receive a JsonArray...
+			vertx.eventBus().send("mytumble.tumblr.loadposts", params, new Handler<AsyncResult<Message<JsonArray>>>() {
 			  @Override
 			  public void handle(AsyncResult<Message<JsonArray>> result) {
 				  if (result.failed()) {
-					  ctx.fail(500);
+					  ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
 					  return;
 				  }
 				  // TODO how about saving to DB directly here?
