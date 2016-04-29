@@ -44,16 +44,42 @@ public class WebServer extends AbstractVerticle {
 		  });
 		});
 
+		router.put("/api/newfollowers").handler(ctx -> {
+			logger.info("Retrieve new followers");
+			vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, new Handler<AsyncResult<Message<JsonArray>>>() {
+			  @Override
+			  public void handle(AsyncResult<Message<JsonArray>> loaded) {
+				  if (loaded.failed()) {
+					  ctx.response().setStatusCode(500).setStatusMessage(loaded.cause().getLocalizedMessage()).end();
+					  return;
+				  }
+				  vertx.eventBus().send("mytumble.mongo.savefollowers", loaded, new Handler<AsyncResult<Message<JsonArray>>>() {
+			      @Override
+			      public void handle(AsyncResult<Message<JsonArray>> saved) {
+				      if (saved.failed()) {
+					      ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
+					      return;
+				      }
+				      ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+				      ctx.response().end(saved.result().body().encode());
+				      return;
+			      }
+		      });
+				  ctx.response().setStatusCode(500).setStatusMessage("Why did I get this?!?!?").end();
+				  return;
+			  }
+		  });
+		});
+
 		router.get("/api/followers").handler(ctx -> {
 			logger.info("Get followers");
-			vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, new Handler<AsyncResult<Message<JsonArray>>>() {
+			vertx.eventBus().send("mytumble.mongo.getfollowers", null, new Handler<AsyncResult<Message<JsonArray>>>() {
 			  @Override
 			  public void handle(AsyncResult<Message<JsonArray>> result) {
 				  if (result.failed()) {
 					  ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
 					  return;
 				  }
-				  // TODO how about saving to DB directly here?
 				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
 				  ctx.response().end(result.result().body().encode());
 				  return;
@@ -61,10 +87,14 @@ public class WebServer extends AbstractVerticle {
 		  });
 		});
 
-		router.get("/api/posts").handler(ctx -> {
-			logger.info("Get posts");
+		router.put("/api/newposts").handler(ctx -> {
+			logger.info("Retrieve new posts");
 			JsonArray params = new JsonArray();
-			params.add(5);
+			String howMany = ctx.request().getParam("howmany");
+			if (null == howMany) {
+				howMany = "5";
+			}
+			params.add(Integer.valueOf(howMany));
 			// instead of the JsonArray trick one could write a custom MessageCodec
 		  // allowing to send an integer and receive a JsonArray...
 			vertx.eventBus().send("mytumble.tumblr.loadposts", params, new Handler<AsyncResult<Message<JsonArray>>>() {
@@ -75,23 +105,6 @@ public class WebServer extends AbstractVerticle {
 					  return;
 				  }
 				  // TODO how about saving to DB directly here?
-				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-				  ctx.response().end(result.result().body().encode());
-				  return;
-			  }
-		  });
-		});
-
-		router.get("/api/users").handler(ctx -> {
-			vertx.eventBus().send("mytumble.mongo.findall", new JsonObject(), new Handler<AsyncResult<Message<JsonArray>>>() {
-			  @Override
-			  public void handle(AsyncResult<Message<JsonArray>> result) {
-				  if (result.failed()) {
-					  ctx.fail(500);
-					  return;
-				  }
-				  // now convert the list to a JsonArray because it will be easier
-		      // to encode the final object as the response.
 				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
 				  ctx.response().end(result.result().body().encode());
 				  return;

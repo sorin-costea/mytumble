@@ -1,17 +1,17 @@
 package org.sorincos.mytumble;
 
-import java.util.LinkedList;
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.MongoClient;
+import io.vertx.ext.mongo.UpdateOptions;
 
 @Component
 @ConfigurationProperties(prefix = "database")
@@ -19,32 +19,6 @@ public class MongoConnector extends AbstractVerticle {
 	static final Logger logger = LoggerFactory.getLogger(MongoConnector.class);
 
 	private String name;
-
-	private MongoClient mongo;
-
-	@Override
-	public void start() throws Exception {
-		// Create a mongo client using all defaults (connect to localhost and
-		// default port) using the given name
-		mongo = MongoClient.createShared(vertx, new JsonObject().put("db_name", name));
-
-		// the load function just populates some data on the storage
-		loadData(mongo);
-
-		// and listen for messages
-		// TODO can be blocking?
-		vertx.eventBus().consumer("mytumble.mongo.findall", message -> {
-			mongo.find("users", new JsonObject(), lookup -> {
-			  final JsonArray json = new JsonArray();
-
-			  for (JsonObject o : lookup.result()) {
-				  json.add(o);
-			  }
-			  message.reply(json);
-		  });
-		});
-
-	}
 
 	public String getName() {
 		return name;
@@ -54,24 +28,61 @@ public class MongoConnector extends AbstractVerticle {
 		this.name = database;
 	}
 
-	private void loadData(MongoClient db) {
-		db.dropCollection("users", drop -> {
-			if (drop.failed()) {
-				throw new RuntimeException(drop.cause());
-			}
+	@Override
+	public void start() throws Exception {
+		MongoClient mongo = MongoClient.createShared(vertx, new JsonObject().put("db_name", name));
+		vertx.getOrCreateContext().put("mongoclient", mongo);
 
-			List<JsonObject> users = new LinkedList<>();
+		EventBus eb = vertx.eventBus();
+		eb.<JsonArray>consumer("mytumble.mongo.savefollowers").handler(this::saveFollowers);
+		eb.<JsonArray>consumer("mytumble.mongo.getfollowers").handler(this::getFollowers);
+	}
 
-			users.add(new JsonObject().put("username", "pmlopes").put("firstName", "Paulo").put("lastName", "Lopes")
-		      .put("address", "The Netherlands"));
-
-			users.add(new JsonObject().put("username", "timfox").put("firstName", "Tim").put("lastName", "Fox").put("address",
-		      "The Moon"));
-
-			for (JsonObject user : users) {
-				db.insert("users", user, res -> {
-			    logger.info("inserted " + user.encode());
+	private void saveFollowers(Message<JsonArray> msg) {
+		vertx.<JsonArray>executeBlocking(future -> {
+			try {
+				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
+				UpdateOptions options = new UpdateOptions().setUpsert(true);
+				msg.body().forEach(follower -> {
+			    JsonObject upsert = new JsonObject().put("$set", (JsonObject) follower);
+			    client.updateWithOptions("followers",
+		          new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options, res -> {
+			          if (res.succeeded()) {
+				          future.complete();
+			          } else {
+				          future.fail(res.cause().getLocalizedMessage());
+			          }
+		          });
 		    });
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				future.fail(ex.getLocalizedMessage());
+			}
+		}, result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().getLocalizedMessage());
+			}
+		});
+	}
+
+	private void getFollowers(Message<JsonArray> msg) {
+		vertx.<JsonArray>executeBlocking(future -> {
+			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
+			client.find("followers", new JsonObject(), res -> {
+			  if (res.failed()) {
+				  future.fail(res.cause().getLocalizedMessage());
+			  }
+			  final JsonArray followers = new JsonArray();
+			  res.result().forEach(followers::add);
+			  future.complete(followers);
+		  });
+		}, result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().getLocalizedMessage());
 			}
 		});
 	}

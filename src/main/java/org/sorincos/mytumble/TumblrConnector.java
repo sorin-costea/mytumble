@@ -1,5 +1,6 @@
 package org.sorincos.mytumble;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +76,6 @@ public class TumblrConnector extends AbstractVerticle {
 
 	@Override
 	public void start() throws Exception {
-		// Create a Tumblr client
 		JumblrClient client = new JumblrClient(key, secret);
 		client.setToken(oauthtoken, oauthpass);
 		EventBus eb = vertx.eventBus();
@@ -132,9 +132,6 @@ public class TumblrConnector extends AbstractVerticle {
 				int count = 0;
 				for (Post post : posts) {
 					logger.info("Post #" + count);
-					if (++count > 5) { // TODO better use a timestamp on latest activity
-						break;
-					}
 					JsonObject jsonPost = new JsonObject();
 					jsonPost.put("timestamp", post.getTimestamp());
 					if (null != post.getRebloggedFromName()) {
@@ -170,6 +167,7 @@ public class TumblrConnector extends AbstractVerticle {
 		vertx.<JsonArray>executeBlocking(future -> {
 			Blog myBlog = null;
 			try {
+				long now = new Date().getTime();
 				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
 				for (Blog blog : client.user().getBlogs()) {
 					if (0 == blog.getName().compareTo(blogname)) {
@@ -202,6 +200,7 @@ public class TumblrConnector extends AbstractVerticle {
 					jsonFollower.put("is_followed", follower.isFollowing());
 					String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
 					jsonFollower.put("avatar", avatar);
+					jsonFollower.put("lastcheck", now);
 					jsonFollowers.add(jsonFollower);
 				}
 				future.complete(jsonFollowers);
