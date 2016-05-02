@@ -36,6 +36,8 @@ public class MongoConnector extends AbstractVerticle {
 		EventBus eb = vertx.eventBus();
 		eb.<JsonArray>consumer("mytumble.mongo.savefollowers").handler(this::saveFollowers);
 		eb.<JsonArray>consumer("mytumble.mongo.getfollowers").handler(this::getFollowers);
+		eb.<JsonArray>consumer("mytumble.mongo.saveposts").handler(this::savePosts);
+		eb.<JsonArray>consumer("mytumble.mongo.getposts").handler(this::getPosts);
 	}
 
 	private void saveFollowers(Message<JsonArray> msg) {
@@ -67,6 +69,36 @@ public class MongoConnector extends AbstractVerticle {
 		});
 	}
 
+	private void savePosts(Message<JsonArray> msg) {
+		vertx.<JsonArray>executeBlocking(future -> {
+			try {
+				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
+				UpdateOptions options = new UpdateOptions().setUpsert(true);
+				msg.body().forEach(post -> {
+			    JsonObject upsert = new JsonObject().put("$set", (JsonObject) post);
+			    client.updateWithOptions("posts",
+		          new JsonObject().put("postid", upsert.getJsonObject("$set").getString("postid")), upsert, options,
+		          res -> {
+			          if (res.succeeded()) {
+				          future.complete();
+			          } else {
+				          future.fail(res.cause().getLocalizedMessage());
+			          }
+		          });
+		    });
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				future.fail(ex.getLocalizedMessage());
+			}
+		}, result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().getLocalizedMessage());
+			}
+		});
+	}
+
 	private void getFollowers(Message<JsonArray> msg) {
 		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
@@ -77,6 +109,26 @@ public class MongoConnector extends AbstractVerticle {
 			  final JsonArray followers = new JsonArray();
 			  res.result().forEach(followers::add);
 			  future.complete(followers);
+		  });
+		}, result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().getLocalizedMessage());
+			}
+		});
+	}
+
+	private void getPosts(Message<JsonArray> msg) {
+		vertx.<JsonArray>executeBlocking(future -> {
+			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
+			client.find("posts", new JsonObject(), res -> {
+			  if (res.failed()) {
+				  future.fail(res.cause().getLocalizedMessage());
+			  }
+			  final JsonArray posts = new JsonArray();
+			  res.result().forEach(posts::add);
+			  future.complete(posts);
 		  });
 		}, result -> {
 			if (result.succeeded()) {

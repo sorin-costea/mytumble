@@ -134,6 +134,7 @@ public class TumblrConnector extends AbstractVerticle {
 					logger.info("Post #" + count);
 					JsonObject jsonPost = new JsonObject();
 					jsonPost.put("timestamp", post.getTimestamp());
+					jsonPost.put("postid", post.getId());
 					if (null != post.getRebloggedFromName()) {
 						continue; // don't care about what I reblogged
 					}
