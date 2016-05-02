@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
+import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.JsonArray;
@@ -95,30 +96,45 @@ public class WebServer extends AbstractVerticle {
 	}
 
 	private void loadFollowers(RoutingContext ctx) {
-		logger.info("Retrieve new followers");
-		vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, new Handler<AsyncResult<Message<JsonArray>>>() {
-			@Override
-			public void handle(AsyncResult<Message<JsonArray>> loaded) {
-				if (loaded.failed()) {
-					ctx.response().setStatusCode(500).setStatusMessage(loaded.cause().getLocalizedMessage()).end();
-					return;
-				}
-				vertx.eventBus().send("mytumble.mongo.savefollowers", loaded, new Handler<AsyncResult<Message<JsonArray>>>() {
+		JsonArray params = new JsonArray();
+		String howMany = ctx.request().getParam("howmany");
+		if (null != howMany) {
+			params.add(Integer.valueOf(howMany));
+		}
+		logger.info("Retrieve followers " + ((null == howMany) ? "" : Integer.valueOf(howMany)));
+
+		// instead of the JsonArray trick one could write a custom MessageCodec
+		// allowing to send an integer and receive a JsonArray...
+		DeliveryOptions options = new DeliveryOptions();
+		options.setSendTimeout(5 * 60 * 1000); // 5 minutes, just because
+		vertx.eventBus().send("mytumble.tumblr.loadfollowers", params, options,
+		    new Handler<AsyncResult<Message<JsonArray>>>() {
 			    @Override
-			    public void handle(AsyncResult<Message<JsonArray>> saved) {
-				    if (saved.failed()) {
-					    ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
+			    public void handle(AsyncResult<Message<JsonArray>> loaded) {
+				    if (loaded.failed()) {
+					    ctx.response().setStatusCode(500).setStatusMessage(loaded.cause().getLocalizedMessage()).end();
 					    return;
 				    }
-				    ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-				    ctx.response().end(saved.result().body().encode());
-				    return;
+				    try {
+					    vertx.eventBus().send("mytumble.mongo.savefollowers", loaded.result().body(),
+		              new Handler<AsyncResult<Message<JsonArray>>>() {
+			              @Override
+			              public void handle(AsyncResult<Message<JsonArray>> saved) {
+				              if (saved.failed()) {
+					              ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
+					              return;
+				              }
+				              ctx.response().setStatusCode(200).end();
+				              return;
+			              }
+		              });
+				    } catch (Exception ex) {
+					    ex.printStackTrace();
+					    ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+					    return;
+				    }
 			    }
 		    });
-				ctx.response().setStatusCode(500).setStatusMessage("Why did I get here?!?!?").end();
-				return;
-			}
-		});
 	}
 
 	private void loadPosts(RoutingContext ctx) {
@@ -138,20 +154,24 @@ public class WebServer extends AbstractVerticle {
 					ctx.response().setStatusCode(500).setStatusMessage(loaded.cause().getLocalizedMessage()).end();
 					return;
 				}
-				vertx.eventBus().send("mytumble.mongo.saveposts", loaded, new Handler<AsyncResult<Message<JsonArray>>>() {
-			    @Override
-			    public void handle(AsyncResult<Message<JsonArray>> saved) {
-				    if (saved.failed()) {
-					    ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
-					    return;
-				    }
-				    ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-				    ctx.response().end(saved.result().body().encode());
-				    return;
-			    }
-		    });
-				ctx.response().setStatusCode(500).setStatusMessage("Why did I get here?!?!?").end();
-				return;
+				try {
+					vertx.eventBus().send("mytumble.mongo.saveposts", loaded.result().body(),
+		          new Handler<AsyncResult<Message<JsonArray>>>() {
+			          @Override
+			          public void handle(AsyncResult<Message<JsonArray>> saved) {
+				          if (saved.failed()) {
+					          ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
+					          return;
+				          }
+				          ctx.response().setStatusCode(200).end();
+				          return;
+			          }
+		          });
+				} catch (Exception ex) {
+					ex.printStackTrace();
+					ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+					return;
+				}
 			}
 		});
 

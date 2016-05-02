@@ -49,13 +49,12 @@ public class MongoConnector extends AbstractVerticle {
 			    JsonObject upsert = new JsonObject().put("$set", (JsonObject) follower);
 			    client.updateWithOptions("followers",
 		          new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options, res -> {
-			          if (res.succeeded()) {
-				          future.complete();
-			          } else {
-				          future.fail(res.cause().getLocalizedMessage());
+			          if (res.failed()) {
+				          throw new RuntimeException(res.cause());
 			          }
 		          });
 		    });
+				future.complete();
 			} catch (Exception ex) {
 				ex.printStackTrace();
 				future.fail(ex.getLocalizedMessage());
@@ -77,15 +76,13 @@ public class MongoConnector extends AbstractVerticle {
 				msg.body().forEach(post -> {
 			    JsonObject upsert = new JsonObject().put("$set", (JsonObject) post);
 			    client.updateWithOptions("posts",
-		          new JsonObject().put("postid", upsert.getJsonObject("$set").getString("postid")), upsert, options,
-		          res -> {
-			          if (res.succeeded()) {
-				          future.complete();
-			          } else {
-				          future.fail(res.cause().getLocalizedMessage());
+		          new JsonObject().put("postid", upsert.getJsonObject("$set").getLong("postid")), upsert, options, res -> {
+			          if (res.failed()) {
+				          throw new RuntimeException(res.cause());
 			          }
 		          });
 		    });
+				future.complete();
 			} catch (Exception ex) {
 				ex.printStackTrace();
 				future.fail(ex.getLocalizedMessage());

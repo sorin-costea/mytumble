@@ -131,7 +131,7 @@ public class TumblrConnector extends AbstractVerticle {
 				JsonArray jsonPosts = new JsonArray();
 				int count = 0;
 				for (Post post : posts) {
-					logger.info("Post #" + count);
+					logger.info("Post " + ++count + "/" + posts.size());
 					JsonObject jsonPost = new JsonObject();
 					jsonPost.put("timestamp", post.getTimestamp());
 					jsonPost.put("postid", post.getId());
@@ -183,6 +183,10 @@ public class TumblrConnector extends AbstractVerticle {
 				logger.info("Followers: " + numFollowers);
 
 				Map<String, String> options = new HashMap<String, String>();
+				String howMany = msg.body().getString(0);
+				if (null != howMany) {
+					numFollowers = Integer.parseInt(howMany);
+				}
 				options.put("offset", Integer.toString(0));
 				List<User> followers = myBlog.followers(options);
 				for (Integer offset = 20; offset < numFollowers; offset += 20) {
@@ -193,14 +197,12 @@ public class TumblrConnector extends AbstractVerticle {
 				JsonArray jsonFollowers = new JsonArray();
 				int count = 0;
 				for (User follower : followers) {
-					if (++count % 50 == 0) {
-						logger.info("%s", count);
-					}
+					logger.info("Info about " + ++count + "/" + numFollowers + " " + follower.getName());
 					JsonObject jsonFollower = new JsonObject();
 					jsonFollower.put("name", follower.getName());
 					jsonFollower.put("is_followed", follower.isFollowing());
-					String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
-					jsonFollower.put("avatar", avatar);
+					// String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
+		      // jsonFollower.put("avatar", avatar);
 					jsonFollower.put("lastcheck", now);
 					jsonFollowers.add(jsonFollower);
 				}
