@@ -28,16 +28,16 @@ public class WebServer extends AbstractVerticle {
 		Router router = Router.router(vertx);
 		router.route().handler(BodyHandler.create());
 
-		router.put("/api/status/:loadFollowers").handler(this::loadFollowers);
-		router.put("/api/status/:loadPosts").handler(this::loadPosts);
+		router.put("/api/status/loadfollowers").handler(this::loadFollowers);
+		router.put("/api/status/loadposts").handler(this::loadPosts);
 		router.put("/api/status").handler(ctx -> {
 			logger.info("Put some other status??");
-			ctx.response().setStatusCode(400).setStatusMessage("Nothing to do").end();
+			ctx.response().setStatusCode(400).setStatusMessage("What status wanna change? loadFollowers or loadPosts?").end();
 			return;
 		});
 		router.get("/api/status").handler(ctx -> {
 			logger.info("Get retrieval status");
-			ctx.fail(501);
+			ctx.fail(501); // not implemented yet
 			return;
 		});
 
@@ -95,12 +95,7 @@ public class WebServer extends AbstractVerticle {
 	}
 
 	private void loadFollowers(RoutingContext ctx) {
-		String loadFollowers = ctx.request().getParam("loadFollowers");
 		logger.info("Retrieve new followers");
-		if (null == loadFollowers || !(0 == loadFollowers.compareTo("true"))) {
-			ctx.response().setStatusCode(400).setStatusMessage("Nothing to do").end();
-			return;
-		}
 		vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, new Handler<AsyncResult<Message<JsonArray>>>() {
 			@Override
 			public void handle(AsyncResult<Message<JsonArray>> loaded) {
@@ -127,17 +122,12 @@ public class WebServer extends AbstractVerticle {
 	}
 
 	private void loadPosts(RoutingContext ctx) {
-		String loadPosts = ctx.request().getParam("loadposts");
-		logger.info("Retrieve new posts");
-		if (null == loadPosts || !(0 == loadPosts.compareTo("true"))) {
-			ctx.response().setStatusCode(400).setStatusMessage("Nothing to do").end();
-			return;
-		}
 		JsonArray params = new JsonArray();
 		String howMany = ctx.request().getParam("howmany");
 		if (null == howMany) {
 			howMany = "10";
 		}
+		logger.info("Retrieve latest " + howMany + " posts");
 		params.add(Integer.valueOf(howMany));
 		// instead of the JsonArray trick one could write a custom MessageCodec
 		// allowing to send an integer and receive a JsonArray...
