@@ -3,13 +3,12 @@ package org.sorincos.mytumble;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.sorincos.mytumble.VertxBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.test.SpringApplicationConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 @RunWith(SpringJUnit4ClassRunner.class)
-@SpringApplicationConfiguration(classes = VertxBootApplication.class)
+@SpringBootTest(classes = VertxBootApplication.class)
 @ConfigurationProperties(prefix = "connection")
 public class VertxBootApplicationTests {
 

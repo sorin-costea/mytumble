@@ -83,25 +83,6 @@ public class TumblrConnector extends AbstractVerticle {
 
 		eb.<JsonArray>consumer("mytumble.tumblr.loadfollowers").handler(this::loadFollowers);
 		eb.<JsonArray>consumer("mytumble.tumblr.loadposts").handler(this::loadPosts);
-		eb.<String>consumer("mytumble.tumblr.test").handler(this::test);
-
-	}
-
-	private void test(Message<String> msg) {
-		vertx.<String>executeBlocking(future -> {
-			try {
-				future.complete("Yay!");
-			} catch (Exception ex) {
-				ex.printStackTrace();
-				future.fail(ex.getMessage());
-			}
-		}, result -> {
-			if (result.succeeded()) {
-				msg.reply(result.result());
-			} else {
-				msg.fail(1, result.cause().toString());
-			}
-		});
 	}
 
 	private void loadPosts(Message<JsonArray> msg) {
@@ -131,13 +112,14 @@ public class TumblrConnector extends AbstractVerticle {
 				JsonArray jsonPosts = new JsonArray();
 				int count = 0;
 				for (Post post : posts) {
-					logger.info("Post " + ++count + "/" + posts.size());
+					count++;
 					JsonObject jsonPost = new JsonObject();
 					jsonPost.put("timestamp", post.getTimestamp());
 					jsonPost.put("postid", post.getId());
 					if (null != post.getRebloggedFromName()) {
 						continue; // don't care about what I reblogged
 					}
+					logger.info("Post " + count + "/" + posts.size()); // only own posts are logged
 					JsonArray jsonNotes = new JsonArray();
 					for (Note note : post.getNotes()) {
 						logger.info("- " + post.getNoteCount() + "/" + note.getBlogName());
@@ -202,7 +184,7 @@ public class TumblrConnector extends AbstractVerticle {
 					jsonFollower.put("name", follower.getName());
 					jsonFollower.put("is_followed", follower.isFollowing());
 					// String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
-		      // jsonFollower.put("avatar", avatar);
+					// jsonFollower.put("avatar", avatar);
 					jsonFollower.put("lastcheck", now);
 					jsonFollowers.add(jsonFollower);
 				}

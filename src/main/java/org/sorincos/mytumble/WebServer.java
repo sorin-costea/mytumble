@@ -45,49 +45,49 @@ public class WebServer extends AbstractVerticle {
 		router.get("/api/test").handler(ctx -> {
 			logger.info("Test");
 			vertx.eventBus().send("mytumble.tumblr.test", null, new Handler<AsyncResult<Message<String>>>() {
-			  @Override
-			  public void handle(AsyncResult<Message<String>> result) {
-				  if (result.failed()) {
-					  ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-					  return;
-				  }
-				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-				  ctx.response().end(result.result().body());
-				  return;
-			  }
-		  });
+				@Override
+				public void handle(AsyncResult<Message<String>> result) {
+					if (result.failed()) {
+						ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+						return;
+					}
+					ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+					ctx.response().end(result.result().body());
+					return;
+				}
+			});
 		});
 
 		router.get("/api/followers").handler(ctx -> {
 			logger.info("Get followers");
 			vertx.eventBus().send("mytumble.mongo.getfollowers", null, new Handler<AsyncResult<Message<JsonArray>>>() {
-			  @Override
-			  public void handle(AsyncResult<Message<JsonArray>> result) {
-				  if (result.failed()) {
-					  ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-					  return;
-				  }
-				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-				  ctx.response().end(result.result().body().encode());
-				  return;
-			  }
-		  });
+				@Override
+				public void handle(AsyncResult<Message<JsonArray>> result) {
+					if (result.failed()) {
+						ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+						return;
+					}
+					ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+					ctx.response().end(result.result().body().encode());
+					return;
+				}
+			});
 		});
 
 		router.get("/api/posts").handler(ctx -> {
 			logger.info("Get posts");
 			vertx.eventBus().send("mytumble.mongo.getposts", null, new Handler<AsyncResult<Message<JsonArray>>>() {
-			  @Override
-			  public void handle(AsyncResult<Message<JsonArray>> result) {
-				  if (result.failed()) {
-					  ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-					  return;
-				  }
-				  ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-				  ctx.response().end(result.result().body().encode());
-				  return;
-			  }
-		  });
+				@Override
+				public void handle(AsyncResult<Message<JsonArray>> result) {
+					if (result.failed()) {
+						ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+						return;
+					}
+					ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+					ctx.response().end(result.result().body().encode());
+					return;
+				}
+			});
 		});
 
 		router.route().handler(StaticHandler.create());
@@ -117,17 +117,17 @@ public class WebServer extends AbstractVerticle {
 				    }
 				    try {
 					    vertx.eventBus().send("mytumble.mongo.savefollowers", loaded.result().body(),
-		              new Handler<AsyncResult<Message<JsonArray>>>() {
-			              @Override
-			              public void handle(AsyncResult<Message<JsonArray>> saved) {
-				              if (saved.failed()) {
-					              ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
-					              return;
-				              }
-				              ctx.response().setStatusCode(200).end();
-				              return;
-			              }
-		              });
+					        new Handler<AsyncResult<Message<JsonArray>>>() {
+						        @Override
+						        public void handle(AsyncResult<Message<JsonArray>> saved) {
+							        if (saved.failed()) {
+								        ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
+								        return;
+							        }
+							        ctx.response().setStatusCode(200).end();
+							        return;
+						        }
+					        });
 				    } catch (Exception ex) {
 					    ex.printStackTrace();
 					    ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
@@ -156,17 +156,17 @@ public class WebServer extends AbstractVerticle {
 				}
 				try {
 					vertx.eventBus().send("mytumble.mongo.saveposts", loaded.result().body(),
-		          new Handler<AsyncResult<Message<JsonArray>>>() {
-			          @Override
-			          public void handle(AsyncResult<Message<JsonArray>> saved) {
-				          if (saved.failed()) {
-					          ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
-					          return;
-				          }
-				          ctx.response().setStatusCode(200).end();
-				          return;
-			          }
-		          });
+					    new Handler<AsyncResult<Message<JsonArray>>>() {
+						    @Override
+						    public void handle(AsyncResult<Message<JsonArray>> saved) {
+							    if (saved.failed()) {
+								    ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
+								    return;
+							    }
+							    ctx.response().setStatusCode(200).end();
+							    return;
+						    }
+					    });
 				} catch (Exception ex) {
 					ex.printStackTrace();
 					ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
