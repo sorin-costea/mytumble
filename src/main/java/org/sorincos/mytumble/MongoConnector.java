@@ -42,6 +42,7 @@ public class MongoConnector extends SyncVerticle {
 		eb.<JsonArray>consumer("mytumble.mongo.getfollowers").handler(this::getFollowers);
 		eb.<JsonArray>consumer("mytumble.mongo.saveposts").handler(this::savePosts);
 		eb.<JsonArray>consumer("mytumble.mongo.getposts").handler(this::getPosts);
+		eb.<String>consumer("mytumble.mongo.unfollowblog").handler(this::unfollowBlog);
 	}
 
 	@Suspendable
@@ -137,6 +138,39 @@ public class MongoConnector extends SyncVerticle {
 				final JsonArray posts = new JsonArray();
 				res.result().forEach(posts::add);
 				future.complete(posts);
+			});
+		}, result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().getLocalizedMessage());
+			}
+		});
+	}
+
+	private void unfollowBlog(Message<String> msg) {
+		vertx.<String>executeBlocking(future -> {
+			String blogName = msg.body();
+			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
+			client.find("followers", new JsonObject().put("name", blogName), res -> {
+				if (res.failed()) {
+					future.fail(res.cause().getLocalizedMessage());
+				}
+				if (1 != res.result().size()) {
+					future.fail("Found " + res.result().size() + " results for " + blogName);
+				}
+				JsonObject follower = res.result().get(0);
+				follower.put("special", false);
+				follower.put("is_followed", false);
+				JsonObject update = new JsonObject().put("$set", (JsonObject) follower);
+				UpdateOptions options = new UpdateOptions();
+				client.updateCollectionWithOptions("followers",
+				    new JsonObject().put("name", update.getJsonObject("$set").getString("name")), update, options, updated -> {
+					    if (updated.failed()) {
+						    future.fail(updated.cause().getLocalizedMessage());
+					    }
+				    });
+				future.complete();
 			});
 		}, result -> {
 			if (result.succeeded()) {

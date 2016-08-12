@@ -83,6 +83,42 @@ public class TumblrConnector extends AbstractVerticle {
 
 		eb.<JsonArray>consumer("mytumble.tumblr.loadfollowers").handler(this::loadFollowers);
 		eb.<JsonArray>consumer("mytumble.tumblr.loadposts").handler(this::loadPosts);
+		eb.<String>consumer("mytumble.tumblr.unfollowblog").handler(this::unfollowBlog);
+	}
+
+	private void unfollowBlog(Message<String> msg) {
+		vertx.<String>executeBlocking(future -> {
+			logger.info("Unfollow " + blogname);
+			try {
+				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
+				if (null == client) {
+					future.fail("Error: Jumblr not initialized");
+				}
+				Blog myBlog = null;
+				for (Blog blog : client.user().getBlogs()) {
+					if (0 == blog.getName().compareTo(blogname)) {
+						myBlog = blog;
+						break;
+					}
+				}
+				if (null == myBlog) {
+					future.fail("Error: Blog name not found - " + blogname);
+				}
+				String toUnfollow = msg.body();
+				client.unfollow(toUnfollow); // no return here
+
+				future.complete(toUnfollow);
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				future.fail(ex.getLocalizedMessage());
+			}
+		}, result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().getLocalizedMessage());
+			}
+		});
 	}
 
 	private void loadPosts(Message<JsonArray> msg) {
@@ -186,6 +222,7 @@ public class TumblrConnector extends AbstractVerticle {
 					// String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
 					// jsonFollower.put("avatar", avatar);
 					jsonFollower.put("lastcheck", now);
+					jsonFollower.put("special", false);
 					jsonFollowers.add(jsonFollower);
 				}
 				future.complete(jsonFollowers);

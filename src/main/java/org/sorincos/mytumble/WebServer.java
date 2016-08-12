@@ -32,6 +32,7 @@ public class WebServer extends AbstractVerticle {
 		// trigger refreshing of data
 		router.put("/api/status/refreshfollowers").handler(this::refreshFollowers);
 		router.put("/api/status/refreshposts").handler(this::refreshPosts);
+		router.post("/api/unfollow").handler(this::unfollowBlog);
 
 		// getting cached data
 		router.get("/api/followers").handler(this::getFollowers);
@@ -174,6 +175,42 @@ public class WebServer extends AbstractVerticle {
 							    return;
 						    }
 					    });
+				} catch (Exception ex) {
+					ex.printStackTrace();
+					ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+					return;
+				}
+			}
+		});
+	}
+
+	private void unfollowBlog(RoutingContext ctx) {
+		String blogName = ctx.request().getParam("name");
+		if (null == blogName) {
+			ctx.response().setStatusCode(400).setStatusMessage("Nothing to unfollow.").end();
+			return;
+		}
+		logger.info("Unfollowing " + blogName);
+
+		vertx.eventBus().send("mytumble.tumblr.unfollowblog", blogName, new Handler<AsyncResult<Message<String>>>() {
+			@Override
+			public void handle(AsyncResult<Message<String>> unfollowed) {
+				if (unfollowed.failed()) {
+					ctx.response().setStatusCode(500).setStatusMessage(unfollowed.cause().getLocalizedMessage()).end();
+					return;
+				}
+				try {
+					vertx.eventBus().send("mytumble.mongo.unfollowblog", blogName, new Handler<AsyncResult<Message<String>>>() {
+						@Override
+						public void handle(AsyncResult<Message<String>> saved) {
+							if (saved.failed()) {
+								ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
+								return;
+							}
+							ctx.response().setStatusCode(200).end();
+							return;
+						}
+					});
 				} catch (Exception ex) {
 					ex.printStackTrace();
 					ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
