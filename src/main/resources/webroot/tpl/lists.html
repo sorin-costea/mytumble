@@ -1,21 +1,21 @@
 <h2>Followers</h2>
-<table class="table table-condensed">
-    <thead>
-    <tr>
-        <th>Username</th>
-        <th>Is followed</th>
-        <th>Last check</th>
-        <th>Special</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr ng-repeat="follower in followers.slice(((currentPage-1)*itemsPerPage), ((currentPage)*itemsPerPage))">
-        <td>{{follower.name}}</td>
-        <td>{{follower.is_followed}}</td>
-        <td>{{follower.lastcheck}}</td>
-        <td>{{follower.special}}</td>
-    </tr>
-    </tbody>
-</table>
-<ul uib-pagination total-items="totalItems" max-size="maxSize" boundary-links="true" force-ellipses="true" num-pages="numPages" ng-model="currentPage" ng-change="pageChanged()" class="pagination-sm"></ul>
+<div class='md-padding' layout="row" flex>
+  <div layout="column" flex>
+  <md-card ng-repeat="follower in followers" layout="column" flex> 
+    <md-card-header>
+      <md-card-avatar>
+        <img class="md-user-avatar" src="img/smiley.png"/>
+      </md-card-avatar>
+      <md-card-header-text>
+        <span class="md-title">{{follower.name}}</span>
+        <span class="md-subhead">{{follower.special}}</span> 
+      </md-card-header-text>
+    </md-card-header>
+    <md-card-actions layout="row" layout-align="end center">
+      <md-button>Action 1</md-button> 
+      <md-button>Action 2</md-button> 
+    </md-card-actions> 
+  </md-card>
+  </div>
+</div>
 
