@@ -29,11 +29,20 @@ public class WebServer extends AbstractVerticle {
 		Router router = Router.router(vertx);
 		router.route().handler(BodyHandler.create());
 
-		router.put("/api/status/loadfollowers").handler(this::loadFollowers);
-		router.put("/api/status/loadposts").handler(this::loadPosts);
+		// trigger refreshing of data
+		router.put("/api/status/refreshfollowers").handler(this::refreshFollowers);
+		router.put("/api/status/refreshposts").handler(this::refreshPosts);
+
+		// getting cached data
+		router.get("/api/followers").handler(this::getFollowers);
+		router.get("/api/posts").handler(this::getPosts);
+		router.get("/api/test").handler(this::getTest);
+
+		// error conditions
 		router.put("/api/status").handler(ctx -> {
-			logger.info("Put some other status??");
-			ctx.response().setStatusCode(400).setStatusMessage("What status wanna change? loadFollowers or loadPosts?").end();
+			logger.info("Triggering what??");
+			ctx.response().setStatusCode(400).setStatusMessage("What do you wanna trigger? loadFollowers or loadPosts?")
+			    .end();
 			return;
 		});
 		router.get("/api/status").handler(ctx -> {
@@ -42,69 +51,69 @@ public class WebServer extends AbstractVerticle {
 			return;
 		});
 
-		router.get("/api/test").handler(ctx -> {
-			logger.info("Test");
-			vertx.eventBus().send("mytumble.tumblr.test", null, new Handler<AsyncResult<Message<String>>>() {
-				@Override
-				public void handle(AsyncResult<Message<String>> result) {
-					if (result.failed()) {
-						ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-						return;
-					}
-					ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-					ctx.response().end(result.result().body());
-					return;
-				}
-			});
-		});
-
-		router.get("/api/followers").handler(ctx -> {
-			logger.info("Get followers");
-			vertx.eventBus().send("mytumble.mongo.getfollowers", null, new Handler<AsyncResult<Message<JsonArray>>>() {
-				@Override
-				public void handle(AsyncResult<Message<JsonArray>> result) {
-					if (result.failed()) {
-						ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-						return;
-					}
-					ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-					ctx.response().end(result.result().body().encode());
-					return;
-				}
-			});
-		});
-
-		router.get("/api/posts").handler(ctx -> {
-			logger.info("Get posts");
-			vertx.eventBus().send("mytumble.mongo.getposts", null, new Handler<AsyncResult<Message<JsonArray>>>() {
-				@Override
-				public void handle(AsyncResult<Message<JsonArray>> result) {
-					if (result.failed()) {
-						ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-						return;
-					}
-					ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-					ctx.response().end(result.result().body().encode());
-					return;
-				}
-			});
-		});
-
 		router.route().handler(StaticHandler.create());
 
 		vertx.createHttpServer().requestHandler(router::accept).listen(8080);
 	}
 
-	private void loadFollowers(RoutingContext ctx) {
+	private void getTest(RoutingContext ctx) {
+		logger.info("Test");
+		vertx.eventBus().send("mytumble.tumblr.test", null, new Handler<AsyncResult<Message<String>>>() {
+			@Override
+			public void handle(AsyncResult<Message<String>> result) {
+				if (result.failed()) {
+					ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+					return;
+				}
+				ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+				ctx.response().end(result.result().body());
+				return;
+			}
+		});
+	}
+
+	private void getFollowers(RoutingContext ctx) {
+		logger.info("Get followers");
+		DeliveryOptions options = new DeliveryOptions();
+		options.setSendTimeout(5 * 60 * 1000); // 5 minutes, just because
+		vertx.eventBus().send("mytumble.mongo.getfollowers", null, options, new Handler<AsyncResult<Message<JsonArray>>>() {
+			@Override
+			public void handle(AsyncResult<Message<JsonArray>> result) {
+				if (result.failed()) {
+					ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+					return;
+				}
+				ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+				ctx.response().end(result.result().body().encode());
+				return;
+			}
+		});
+	}
+
+	private void getPosts(RoutingContext ctx) {
+		logger.info("Get posts");
+		vertx.eventBus().send("mytumble.mongo.getposts", null, new Handler<AsyncResult<Message<JsonArray>>>() {
+			@Override
+			public void handle(AsyncResult<Message<JsonArray>> result) {
+				if (result.failed()) {
+					ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+					return;
+				}
+				ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+				ctx.response().end(result.result().body().encode());
+				return;
+			}
+		});
+	}
+
+	private void refreshFollowers(RoutingContext ctx) {
 		JsonArray params = new JsonArray();
 		String howMany = ctx.request().getParam("howmany");
 		if (null != howMany) {
 			params.add(Integer.valueOf(howMany));
 		}
-		logger.info("Retrieve followers " + ((null == howMany) ? "" : Integer.valueOf(howMany)));
+		logger.info("Refresh latest " + ((null == howMany) ? "" : Integer.valueOf(howMany)) + " followers");
 
-		// instead of the JsonArray trick one could write a custom MessageCodec
-		// allowing to send an integer and receive a JsonArray...
 		DeliveryOptions options = new DeliveryOptions();
 		options.setSendTimeout(5 * 60 * 1000); // 5 minutes, just because
 		vertx.eventBus().send("mytumble.tumblr.loadfollowers", params, options,
@@ -137,16 +146,14 @@ public class WebServer extends AbstractVerticle {
 		    });
 	}
 
-	private void loadPosts(RoutingContext ctx) {
+	private void refreshPosts(RoutingContext ctx) {
 		JsonArray params = new JsonArray();
 		String howMany = ctx.request().getParam("howmany");
 		if (null == howMany) {
 			howMany = "10";
 		}
-		logger.info("Retrieve latest " + howMany + " posts");
+		logger.info("Refresh latest " + ((null == howMany) ? "" : Integer.valueOf(howMany)) + " posts");
 		params.add(Integer.valueOf(howMany));
-		// instead of the JsonArray trick one could write a custom MessageCodec
-		// allowing to send an integer and receive a JsonArray...
 		vertx.eventBus().send("mytumble.tumblr.loadposts", params, new Handler<AsyncResult<Message<JsonArray>>>() {
 			@Override
 			public void handle(AsyncResult<Message<JsonArray>> loaded) {
@@ -174,6 +181,5 @@ public class WebServer extends AbstractVerticle {
 				}
 			}
 		});
-
 	}
 }
