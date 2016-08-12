@@ -1,63 +1,38 @@
-angular.module('CrudApp', []).config(['$routeProvider', function ($routeProvider) {
+var myTumble = angular.module('myTumble', ['ngRoute','ui.bootstrap']).config(['$routeProvider', function ($routeProvider) {
     $routeProvider.
-        when('/', {templateUrl: '/tpl/lists.html', controller: ListCtrl}).
-        when('/add-user', {templateUrl: '/tpl/add-new.html', controller: AddCtrl}).
-        when('/edit/:id', {templateUrl: '/tpl/edit.html', controller: EditCtrl}).
+        when('/', {templateUrl: '/tpl/lists.html', controller: 'ListCtrl'}).
         otherwise({redirectTo: '/'});
 }]);
 
-function ListCtrl($scope, $http) {
-    $http.get('/api/users').success(function (data) {
-        $scope.users = data;
-    });
-}
+myTumble.factory('TumblrData', ['$http', function($http){
+	var TumblrData = {};
+	TumblrData.getFollowers = function() {
+		return $http.get('/api/followers');
+	};
+	return TumblrData;
+}]);
 
-function AddCtrl($scope, $http, $location) {
-    $scope.master = {};
-    $scope.activePath = null;
-
-    $scope.add_new = function (user, AddNewForm) {
-
-        $http.post('/api/users', user).success(function () {
-            $scope.reset();
-            $scope.activePath = $location.path('/');
+myTumble.controller('ListCtrl', ['$scope', 'TumblrData', function($scope, TumblrData){
+	TumblrData.getFollowers()
+        .success(function(data) {
+            $scope.followers = data;
+            $scope.totalItems = $scope.followers.length;
         });
+    $scope.viewby = 10;
+    $scope.currentPage = 1;
+    $scope.itemsPerPage = $scope.viewby;
+    $scope.maxSize = 5;
 
-        $scope.reset = function () {
-            $scope.user = angular.copy($scope.master);
-        };
-
-        $scope.reset();
-
-    };
-}
-
-function EditCtrl($scope, $http, $location, $routeParams) {
-    var id = $routeParams.id;
-    $scope.activePath = null;
-
-    $http.get('/api/users/' + id).success(function (data) {
-        $scope.user = data;
-    });
-
-    $scope.update = function (user) {
-        $http.put('/api/users/' + id, user).success(function (data) {
-            $scope.user = data;
-            $scope.activePath = $location.path('/');
-        });
+    $scope.setPage = function (pageNo) {
+      $scope.currentPage = pageNo;
     };
 
-    $scope.delete = function (user) {
-        var deleteUser = confirm('Are you absolutely sure you want to delete ?');
-        if (deleteUser) {
-            $http.delete('/api/users/' + id)
-                .success(function(data, status, headers, config) {
-                    $scope.activePath = $location.path('/');
-                }).
-                error(function(data, status, headers, config) {
-                    console.log("error");
-                    // custom handle error
-                });
-        }
+    $scope.pageChanged = function() {
+      console.log('Page changed to: ' + $scope.currentPage);
     };
-}
+
+    $scope.setItemsPerPage = function(num) {
+    	$scope.itemsPerPage = num;
+    	$scope.currentPage = 1;
+    }
+}]);
