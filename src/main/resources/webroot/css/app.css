@@ -1,3 +1,35 @@
+@import
+	url(http://netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css)
+	;
+
+input[type=checkbox] {
+	display: none;
+}
+
+input[type=checkbox]+label:before {
+	font-family: FontAwesome;
+	display: inline-block;
+}
+
+input[type=checkbox]+label:before {
+	content: "\f096";
+	font-style: normal;
+	letter-spacing: 10px;
+}
+
+input[type=checkbox]:checked+label:before {
+	content: "\f046";
+	font-style: normal;
+	letter-spacing: 6px;
+}
+
+body {
+	background-color: #fefefe;
+	color: #a9a9a9;
+	font-style: italic;
+	font-family: Verdana, Geneva, sans-serif;
+}
+
 .tile {
 	display: inline-block;
 	padding: 5px;
@@ -11,4 +43,9 @@
 	white-space: nowrap;
 	margin-bottom: 0px;
 	margin-top: 0px;
+}
+
+.heavy {
+	font-style: normal;
+	font-weight: bold;
 }
