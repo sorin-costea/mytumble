@@ -1,0 +1,14 @@
+.tile {
+	display: inline-block;
+	padding: 5px;
+	margin: 3px;
+	border: 2px solid whitesmoke;
+	border-radius: 15px;
+	background: #fafafa;
+}
+
+.oneline {
+	white-space: nowrap;
+	margin-bottom: 0px;
+	margin-top: 0px;
+}

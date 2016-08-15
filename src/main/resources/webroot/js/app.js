@@ -1,9 +1,8 @@
-var myTumble = angular.module('myTumble', ['ngRoute','ngMaterial']).config(['$routeProvider', function ($routeProvider) {
+var myTumble = angular.module('myTumble', ['ngRoute']).config(['$routeProvider', function ($routeProvider) {
     $routeProvider.
         when('/', {templateUrl: '/tpl/lists.html', controller: 'ListCtrl'}).
         otherwise({redirectTo: '/'});
 }]);
-
 
 myTumble.factory('TumblrData', ['$http', function($http){
 	var TumblrData = {};

@@ -1,21 +1,24 @@
 <h2>Followers</h2>
-<div class='md-padding' layout="row" flex>
-  <div layout="column" flex>
-  <md-card ng-repeat="follower in followers" layout="column" flex> 
-    <md-card-header>
-      <md-card-avatar>
-        <img class="md-user-avatar" src="img/smiley.png"/>
-      </md-card-avatar>
-      <md-card-header-text>
-        <span class="md-title">{{follower.name}}</span>
-        <span class="md-subhead">{{follower.special}}</span> 
-      </md-card-header-text>
-    </md-card-header>
-    <md-card-actions layout="row" layout-align="end center">
-      <md-button>Action 1</md-button> 
-      <md-button>Action 2</md-button> 
-    </md-card-actions> 
-  </md-card>
+<div style="font-family:Verdana,Geneva,sans-serif">
+  <div ng-repeat="follower in followers" class="tile">
+    <table style="width: 150px">
+      <tr>
+        <td colspan="2"><p class="oneline">{{follower.name}}</p></td>
+      </tr>
+      <tr>
+        <td rowspan="2"><img src="img/smiley.png" /></td>
+        <td style="width: 99%"><div>
+            <input type="checkbox" ng-model="follower.special">Special</input>
+          </div></td>
+      </tr>
+      <tr>
+        <td><div>
+            <input type="checkbox">Action 2</input>
+          </div></td>
+      </tr>
+      <tr>
+        <td colspan="2"><p class="oneline">{{follower.lastcheck}}</p></td>
+      </tr>
+    </table>
   </div>
 </div>
-
