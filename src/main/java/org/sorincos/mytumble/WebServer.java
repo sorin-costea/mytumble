@@ -1,9 +1,13 @@
 package org.sorincos.mytumble;
 
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
+
+import com.google.common.base.Splitter;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
@@ -35,7 +39,7 @@ public class WebServer extends AbstractVerticle {
 		router.post("/api/unfollow").handler(this::unfollowBlog);
 
 		// getting cached data
-		router.get("/api/followers").handler(this::getFollowers);
+		router.get("/api/users").handler(this::getUsers);
 		router.get("/api/posts").handler(this::getPosts);
 		router.get("/api/test").handler(this::getTest);
 
@@ -73,22 +77,29 @@ public class WebServer extends AbstractVerticle {
 		});
 	}
 
-	private void getFollowers(RoutingContext ctx) {
-		logger.info("Get followers");
+	private void getUsers(RoutingContext ctx) {
+		JsonArray params = null;
+		String filter = ctx.request().getParam("filter");
+		if (null != filter && 0 != "undefined".compareToIgnoreCase(filter)) {
+			params = parseParameters(filter);
+		}
+		logger.info("Get " + ((params.size() == 0) ? "" : filter) + " followers");
+
 		DeliveryOptions options = new DeliveryOptions();
 		options.setSendTimeout(5 * 60 * 1000); // 5 minutes, just because
-		vertx.eventBus().send("mytumble.mongo.getfollowers", null, options, new Handler<AsyncResult<Message<JsonArray>>>() {
-			@Override
-			public void handle(AsyncResult<Message<JsonArray>> result) {
-				if (result.failed()) {
-					ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-					return;
-				}
-				ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-				ctx.response().end(result.result().body().encode());
-				return;
-			}
-		});
+		vertx.eventBus().send("mytumble.mongo.getfollowers", params, options,
+		    new Handler<AsyncResult<Message<JsonArray>>>() {
+			    @Override
+			    public void handle(AsyncResult<Message<JsonArray>> result) {
+				    if (result.failed()) {
+					    ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+					    return;
+				    }
+				    ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+				    ctx.response().end(result.result().body().encode());
+				    return;
+			    }
+		    });
 	}
 
 	private void getPosts(RoutingContext ctx) {
@@ -113,7 +124,7 @@ public class WebServer extends AbstractVerticle {
 		if (null != howMany) {
 			params.add(Integer.valueOf(howMany));
 		}
-		logger.info("Refresh latest " + ((null == howMany) ? "" : Integer.valueOf(howMany)) + " followers");
+		logger.info("Refresh" + ((params.size() == 0) ? "" : (" latest " + Integer.valueOf(howMany))) + " followers");
 
 		DeliveryOptions options = new DeliveryOptions();
 		options.setSendTimeout(5 * 60 * 1000); // 5 minutes, just because
@@ -218,5 +229,14 @@ public class WebServer extends AbstractVerticle {
 				}
 			}
 		});
+	}
+
+	private JsonArray parseParameters(String parameters) {
+		List<String> filters = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(parameters);
+		JsonArray params = new JsonArray();
+		for (String filter : filters) {
+			params.add(filter);
+		}
+		return params;
 	}
 }

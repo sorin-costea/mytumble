@@ -1,0 +1,26 @@
+<h2 class="heavy">Big list</h2>
+<div>
+  <div ng-repeat="auser in users" class="tile">
+    <table style="width: 150px">
+      <tr>
+        <td colspan="2"><p class="oneline heavy">{{auser.name}}</p></td>
+      </tr>
+      <tr>
+        <td rowspan="2" width="48px"><img src="img/smiley.png" /></td>
+        <td><div>
+            <input type="checkbox" ng-model="auser.special" id="special-{{auser.name}}"/>
+            <label for="special-{{auser.name}}">Special</label>
+          </div></td>
+      </tr>
+      <tr>
+        <td><div>
+            <input type="checkbox" id="action2-{{auser.name}}"/>
+            <label for="action2-{{auser.name}}">Action 2</label>
+          </div></td>
+      </tr>
+      <tr>
+        <td colspan="2"><p class="oneline">{{auser.lastcheck | date:'yyyy-MM-dd HH:mm'}}</p></td>
+      </tr>
+    </table>
+  </div>
+</div>

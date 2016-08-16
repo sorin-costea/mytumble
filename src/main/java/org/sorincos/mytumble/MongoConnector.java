@@ -106,9 +106,10 @@ public class MongoConnector extends SyncVerticle {
 	}
 
 	private void getFollowers(Message<JsonArray> msg) {
+		JsonObject query = createQueryFromFilters(msg.body());
 		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-			client.find("followers", new JsonObject(), res -> {
+			client.find("followers", query, res -> {
 				if (res.failed()) {
 					future.fail(res.cause().getLocalizedMessage());
 				}
@@ -179,6 +180,11 @@ public class MongoConnector extends SyncVerticle {
 				msg.fail(1, result.cause().getLocalizedMessage());
 			}
 		});
+	}
+
+	private JsonObject createQueryFromFilters(JsonArray filters) {
+		JsonObject query = new JsonObject();
+		return query;
 	}
 
 }

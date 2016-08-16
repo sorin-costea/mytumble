@@ -68,7 +68,7 @@
 		<dependency>
 			<groupId>co.paralleluniverse</groupId>
 			<artifactId>quasar-core</artifactId>
-			<version>0.7.5</version>
+			<version>0.7.6</version>
 			<classifier>jdk8</classifier>
 		</dependency>
 		<dependency>
@@ -80,6 +80,11 @@
 			<groupId>com.tumblr</groupId>
 			<artifactId>jumblr</artifactId>
 			<version>${jumblr.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>19.0</version>
 		</dependency>
 	</dependencies>
 

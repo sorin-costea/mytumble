@@ -1,38 +1,63 @@
-var myTumble = angular.module('myTumble', ['ngRoute']).config(['$routeProvider', function ($routeProvider) {
-    $routeProvider.
-        when('/', {templateUrl: '/tpl/lists.html', controller: 'ListCtrl'}).
-        otherwise({redirectTo: '/'});
-}]);
+var myTumble = angular.module('myTumble', [ 'ui.router' ]).config(
+        [ '$stateProvider', '$urlRouterProvider', function($stateProvider, $urlRouterProvider) {
+            $urlRouterProvider.otherwise('/');
+            $stateProvider.state('home', {
+                url : '/',
+                templateUrl : '/tpl/users.html',
+                controller : 'Followers'
+            }).state('lastlikers', {
+                url : '/lastlikers',
+                templateUrl : '/tpl/users.html',
+                controller : 'LastLikers'
+            }).state('baddies', {
+                url : '/baddies',
+                templateUrl : '/tpl/users.html',
+                controller : 'Baddies'
+            }).state('specials', {
+                url : '/specials',
+                templateUrl : '/tpl/users.html',
+                controller : 'Specials'
+            }).state('notfollowme', {
+                url : '/notfollowme',
+                templateUrl : '/tpl/users.html',
+                controller : 'NotFollowMe'
+            });
+        } ]);
 
-myTumble.factory('TumblrData', ['$http', function($http){
-	var TumblrData = {};
-	TumblrData.getFollowers = function() {
-		return $http.get('/api/followers');
-	};
-	return TumblrData;
-}]);
-
-myTumble.controller('ListCtrl', ['$scope', 'TumblrData', function($scope, TumblrData){
-	TumblrData.getFollowers()
-        .success(function(data) {
-            $scope.followers = data;
-            $scope.totalItems = $scope.followers.length;
-        });
-    $scope.viewby = 10;
-    $scope.currentPage = 1;
-    $scope.itemsPerPage = $scope.viewby;
-    $scope.maxSize = 5;
-
-    $scope.setPage = function (pageNo) {
-      $scope.currentPage = pageNo;
+myTumble.factory('MyBackend', [ '$http', function($http) {
+    var MyBackend = {};
+    MyBackend.getUsers = function(filter) {
+        return $http.get('/api/users' + filter);
     };
+    return MyBackend;
+} ]);
 
-    $scope.pageChanged = function() {
-      console.log('Page changed to: ' + $scope.currentPage);
-    };
+myTumble.controller('Followers', [ '$scope', 'MyBackend', function($scope, MyBackend) {
+    MyBackend.getUsers('?filter=followme,notbad').success(function(data) {
+        $scope.users = data;
+    });
+} ]);
 
-    $scope.setItemsPerPage = function(num) {
-    	$scope.itemsPerPage = num;
-    	$scope.currentPage = 1;
-    }
-}]);
+myTumble.controller('Specials', [ '$scope', 'MyBackend', function($scope, MyBackend) {
+    MyBackend.getUsers('?filter=special').success(function(data) {
+        $scope.users = data;
+    });
+} ]);
+
+myTumble.controller('Baddies', [ '$scope', 'MyBackend', function($scope, MyBackend) {
+    MyBackend.getUsers('?filter=bad').success(function(data) {
+        $scope.users = data;
+    });
+} ]);
+
+myTumble.controller('LastLikers', [ '$scope', 'MyBackend', function($scope, MyBackend) {
+    MyBackend.getUsers('?filter=lastlikers,notbad').success(function(data) {
+        $scope.users = data;
+    });
+} ]);
+
+myTumble.controller('NotFollowMe', [ '$scope', 'MyBackend', function($scope, MyBackend) {
+    MyBackend.getUsers('?filter=notspecial,notfollowme,ifollow').success(function(data) {
+        $scope.users = data;
+    });
+} ]);

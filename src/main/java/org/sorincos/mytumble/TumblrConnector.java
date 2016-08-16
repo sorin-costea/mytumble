@@ -219,8 +219,8 @@ public class TumblrConnector extends AbstractVerticle {
 					JsonObject jsonFollower = new JsonObject();
 					jsonFollower.put("name", follower.getName());
 					jsonFollower.put("is_followed", follower.isFollowing());
-					// String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
-					// jsonFollower.put("avatar", avatar);
+					String avatar = client.blogAvatar(follower.getName() + ".tumblr.com");
+					jsonFollower.put("avatarurl", avatar);
 					jsonFollower.put("lastcheck", now);
 					jsonFollower.put("special", false);
 					jsonFollowers.add(jsonFollower);
