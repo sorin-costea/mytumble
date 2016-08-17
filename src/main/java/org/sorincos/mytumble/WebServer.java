@@ -78,12 +78,9 @@ public class WebServer extends AbstractVerticle {
 	}
 
 	private void getUsers(RoutingContext ctx) {
-		JsonArray params = null;
 		String filter = ctx.request().getParam("filter");
-		if (null != filter && 0 != "undefined".compareToIgnoreCase(filter)) {
-			params = parseParameters(filter);
-		}
-		logger.info("Get " + ((params.size() == 0) ? "" : filter) + " followers");
+		JsonArray params = parseParameters(filter);
+		logger.info("Get " + ((params.size() == 0) ? "" : filter) + " users");
 
 		DeliveryOptions options = new DeliveryOptions();
 		options.setSendTimeout(5 * 60 * 1000); // 5 minutes, just because

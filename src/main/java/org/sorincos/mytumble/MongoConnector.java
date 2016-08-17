@@ -3,10 +3,14 @@ package org.sorincos.mytumble;
 import static io.vertx.ext.sync.Sync.awaitResult;
 import static io.vertx.ext.sync.Sync.fiberHandler;
 
+import java.util.ArrayList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
+
+import com.google.common.collect.Lists;
 
 import co.paralleluniverse.fibers.Suspendable;
 import io.vertx.core.eventbus.EventBus;
@@ -14,6 +18,7 @@ import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.MongoClient;
+import io.vertx.ext.mongo.MongoClientUpdateResult;
 import io.vertx.ext.mongo.UpdateOptions;
 import io.vertx.ext.sync.SyncVerticle;
 
@@ -51,16 +56,15 @@ public class MongoConnector extends SyncVerticle {
 			try {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 				UpdateOptions options = new UpdateOptions().setUpsert(true);
-				msg.body().forEach(follower -> {
+				ArrayList<Object> followers = Lists.newArrayList(msg.body());
+				for (Object follower : followers) {
 					JsonObject upsert = new JsonObject().put("$set", (JsonObject) follower);
 					// await, to not kill Mongo's thread pool
-					awaitResult(h -> client.updateCollectionWithOptions("followers",
-					    new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options, res -> {
-						    if (res.failed()) {
-							    throw new RuntimeException(res.cause());
-						    }
-					    }));
-				});
+					MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("followers",
+					    new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options, h));
+					logger.info("done call: " + res.getDocModified());
+				}
+				logger.info("byes");
 				future.complete();
 			} catch (Exception ex) {
 				ex.printStackTrace();
@@ -81,16 +85,14 @@ public class MongoConnector extends SyncVerticle {
 			try {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 				UpdateOptions options = new UpdateOptions().setUpsert(true);
-				msg.body().forEach(post -> {
+				ArrayList<Object> posts = Lists.newArrayList(msg.body());
+				for (Object post : posts) {
 					JsonObject upsert = new JsonObject().put("$set", (JsonObject) post);
 					// await, to not kill Mongo's thread pool with the foreach
-					awaitResult(h -> client.updateCollectionWithOptions("posts",
-					    new JsonObject().put("postid", upsert.getJsonObject("$set").getLong("postid")), upsert, options, res -> {
-						    if (res.failed()) {
-							    throw new RuntimeException(res.cause());
-						    }
-					    }));
-				});
+					MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("posts",
+					    new JsonObject().put("postid", upsert.getJsonObject("$set").getLong("postid")), upsert, options, h));
+					logger.info("done call: " + res.getDocModified());
+				}
 				future.complete();
 			} catch (Exception ex) {
 				ex.printStackTrace();

@@ -201,10 +201,6 @@ public class TumblrConnector extends AbstractVerticle {
 				logger.info("Followers: " + numFollowers);
 
 				Map<String, String> options = new HashMap<String, String>();
-				String howMany = msg.body().getString(0);
-				if (null != howMany) {
-					numFollowers = Integer.parseInt(howMany);
-				}
 				options.put("offset", Integer.toString(0));
 				List<User> followers = myBlog.followers(options);
 				for (Integer offset = 20; offset < numFollowers; offset += 20) {
