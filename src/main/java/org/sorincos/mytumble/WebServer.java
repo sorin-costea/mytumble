@@ -10,12 +10,10 @@ import org.springframework.stereotype.Component;
 import com.google.common.base.Splitter;
 
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.AsyncResult;
-import io.vertx.core.Handler;
 import io.vertx.core.eventbus.DeliveryOptions;
-import io.vertx.core.eventbus.Message;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
@@ -26,6 +24,8 @@ import io.vertx.ext.web.handler.StaticHandler;
 public class WebServer extends AbstractVerticle {
 
 	static final Logger logger = LoggerFactory.getLogger(WebServer.class);
+	private final DeliveryOptions options = new DeliveryOptions().setSendTimeout(5 * 60 * 1000); // 5 minutes, just
+	                                                                                             // because
 
 	@Override
 	public void start() throws Exception {
@@ -63,17 +63,14 @@ public class WebServer extends AbstractVerticle {
 
 	private void getTest(RoutingContext ctx) {
 		logger.info("Test");
-		vertx.eventBus().send("mytumble.tumblr.test", null, new Handler<AsyncResult<Message<String>>>() {
-			@Override
-			public void handle(AsyncResult<Message<String>> result) {
-				if (result.failed()) {
-					ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-					return;
-				}
-				ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-				ctx.response().end(result.result().body());
+		vertx.eventBus().send("mytumble.tumblr.test", null, result -> {
+			if (result.failed()) {
+				ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
 				return;
 			}
+			ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+			ctx.response().end((String) result.result().body());
+			return;
 		});
 	}
 
@@ -82,36 +79,28 @@ public class WebServer extends AbstractVerticle {
 		JsonArray params = parseParameters(filter);
 		logger.info("Get " + ((params.size() == 0) ? "" : filter) + " users");
 
-		DeliveryOptions options = new DeliveryOptions();
-		options.setSendTimeout(5 * 60 * 1000); // 5 minutes, just because
-		vertx.eventBus().send("mytumble.mongo.getfollowers", params, options,
-		    new Handler<AsyncResult<Message<JsonArray>>>() {
-			    @Override
-			    public void handle(AsyncResult<Message<JsonArray>> result) {
-				    if (result.failed()) {
-					    ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-					    return;
-				    }
-				    ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-				    ctx.response().end(result.result().body().encode());
-				    return;
-			    }
-		    });
-	}
-
-	private void getPosts(RoutingContext ctx) {
-		logger.info("Get posts");
-		vertx.eventBus().send("mytumble.mongo.getposts", null, new Handler<AsyncResult<Message<JsonArray>>>() {
-			@Override
-			public void handle(AsyncResult<Message<JsonArray>> result) {
-				if (result.failed()) {
-					ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-					return;
-				}
-				ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-				ctx.response().end(result.result().body().encode());
+		vertx.eventBus().send("mytumble.mongo.getusers", params, options, result -> {
+			if (result.failed()) {
+				ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
 				return;
 			}
+			ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+			ctx.response().end(((JsonArray) result.result().body()).encode());
+			return;
+		});
+	}
+
+	@Deprecated
+	private void getPosts(RoutingContext ctx) {
+		logger.info("Get posts");
+		vertx.eventBus().send("mytumble.mongo.getposts", null, result -> {
+			if (result.failed()) {
+				ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+				return;
+			}
+			ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+			ctx.response().end(((JsonArray) result.result().body()).encode());
+			return;
 		});
 	}
 
@@ -123,36 +112,26 @@ public class WebServer extends AbstractVerticle {
 		}
 		logger.info("Refresh" + ((params.size() == 0) ? "" : (" latest " + Integer.valueOf(howMany))) + " followers");
 
-		DeliveryOptions options = new DeliveryOptions();
-		options.setSendTimeout(5 * 60 * 1000); // 5 minutes, just because
-		vertx.eventBus().send("mytumble.tumblr.loadfollowers", params, options,
-		    new Handler<AsyncResult<Message<JsonArray>>>() {
-			    @Override
-			    public void handle(AsyncResult<Message<JsonArray>> loaded) {
-				    if (loaded.failed()) {
-					    ctx.response().setStatusCode(500).setStatusMessage(loaded.cause().getLocalizedMessage()).end();
-					    return;
-				    }
-				    try {
-					    vertx.eventBus().send("mytumble.mongo.savefollowers", loaded.result().body(),
-					        new Handler<AsyncResult<Message<JsonArray>>>() {
-						        @Override
-						        public void handle(AsyncResult<Message<JsonArray>> saved) {
-							        if (saved.failed()) {
-								        ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
-								        return;
-							        }
-							        ctx.response().setStatusCode(200).end();
-							        return;
-						        }
-					        });
-				    } catch (Exception ex) {
-					    ex.printStackTrace();
-					    ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
-					    return;
-				    }
-			    }
-		    });
+		try {
+			vertx.eventBus().send("mytumble.tumblr.loadfollowers", params, options, loaded -> {
+				if (loaded.failed()) {
+					ctx.response().setStatusCode(500).setStatusMessage(loaded.cause().getLocalizedMessage()).end();
+					return;
+				}
+				vertx.eventBus().send("mytumble.mongo.saveusers", loaded.result().body(), saved -> {
+					if (saved.failed()) {
+						ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
+						return;
+					}
+					ctx.response().setStatusCode(200).end();
+					return;
+				});
+			});
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+			return;
+		}
 	}
 
 	private void refreshPosts(RoutingContext ctx) {
@@ -163,31 +142,24 @@ public class WebServer extends AbstractVerticle {
 		}
 		logger.info("Refresh latest " + ((null == howMany) ? "" : Integer.valueOf(howMany)) + " posts");
 		params.add(Integer.valueOf(howMany));
-		vertx.eventBus().send("mytumble.tumblr.loadposts", params, new Handler<AsyncResult<Message<JsonArray>>>() {
-			@Override
-			public void handle(AsyncResult<Message<JsonArray>> loaded) {
-				if (loaded.failed()) {
-					ctx.response().setStatusCode(500).setStatusMessage(loaded.cause().getLocalizedMessage()).end();
+		vertx.eventBus().send("mytumble.tumblr.loadposts", params, loaded -> {
+			if (loaded.failed()) {
+				ctx.response().setStatusCode(500).setStatusMessage(loaded.cause().getLocalizedMessage()).end();
+				return;
+			}
+			try {
+				vertx.eventBus().send("mytumble.mongo.saveposts", loaded.result().body(), saved -> {
+					if (saved.failed()) {
+						ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
+						return;
+					}
+					ctx.response().setStatusCode(200).end();
 					return;
-				}
-				try {
-					vertx.eventBus().send("mytumble.mongo.saveposts", loaded.result().body(),
-					    new Handler<AsyncResult<Message<JsonArray>>>() {
-						    @Override
-						    public void handle(AsyncResult<Message<JsonArray>> saved) {
-							    if (saved.failed()) {
-								    ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
-								    return;
-							    }
-							    ctx.response().setStatusCode(200).end();
-							    return;
-						    }
-					    });
-				} catch (Exception ex) {
-					ex.printStackTrace();
-					ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
-					return;
-				}
+				});
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+				return;
 			}
 		});
 	}
@@ -200,32 +172,27 @@ public class WebServer extends AbstractVerticle {
 		}
 		logger.info("Unfollowing " + blogName);
 
-		vertx.eventBus().send("mytumble.tumblr.unfollowblog", blogName, new Handler<AsyncResult<Message<String>>>() {
-			@Override
-			public void handle(AsyncResult<Message<String>> unfollowed) {
+		try {
+			vertx.eventBus().send("mytumble.tumblr.unfollowblog", blogName, unfollowed -> {
 				if (unfollowed.failed()) {
 					ctx.response().setStatusCode(500).setStatusMessage(unfollowed.cause().getLocalizedMessage()).end();
 					return;
 				}
-				try {
-					vertx.eventBus().send("mytumble.mongo.unfollowblog", blogName, new Handler<AsyncResult<Message<String>>>() {
-						@Override
-						public void handle(AsyncResult<Message<String>> saved) {
-							if (saved.failed()) {
-								ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
-								return;
-							}
-							ctx.response().setStatusCode(200).end();
-							return;
-						}
-					});
-				} catch (Exception ex) {
-					ex.printStackTrace();
-					ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+				JsonArray jsonUsers = new JsonArray().add(new JsonObject().put("name", blogName).put("ifollow", false));
+				vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, saved -> {
+					if (saved.failed()) {
+						ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
+						return;
+					}
+					ctx.response().setStatusCode(200).end();
 					return;
-				}
-			}
-		});
+				});
+			});
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+			return;
+		}
 	}
 
 	private JsonArray parseParameters(String parameters) {
