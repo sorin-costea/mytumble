@@ -41,7 +41,10 @@ public class WebServer extends SyncVerticle {
 		// trigger refreshing of data
 		router.put("/api/status/refreshfollowers").handler(fiberHandler(this::refreshFollowers));
 		router.put("/api/status/refreshposts").handler(fiberHandler(this::refreshPosts));
-		router.post("/api/unfollow").handler(fiberHandler(this::unfollowBlog));
+
+		// modifying stuff
+		router.put("/api/users/:name").handler(fiberHandler(this::updateUser));
+		router.post("/api/unfollow").handler(fiberHandler(this::unfollowBlog)); // TODO replace with a simple update
 
 		// getting cached data
 		router.get("/api/users").handler(this::getUsers);
@@ -152,6 +155,7 @@ public class WebServer extends SyncVerticle {
 		}
 	}
 
+	@Deprecated
 	@Suspendable
 	private void unfollowBlog(RoutingContext ctx) {
 		String blogName = ctx.request().getParam("name");
@@ -166,6 +170,28 @@ public class WebServer extends SyncVerticle {
 			Message<String> unfollowed = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.unfollowblog", blogName, h));
 
 			JsonArray jsonUsers = new JsonArray().add(new JsonObject().put("name", blogName).put("ifollow", false));
+			@SuppressWarnings("unused")
+			Message<JsonArray> saved = awaitResult(h -> vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, h));
+			ctx.response().setStatusCode(200).end();
+			return;
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+			return;
+		}
+	}
+
+	@Suspendable
+	private void updateUser(RoutingContext ctx) {
+		String blogName = ctx.request().getParam("name");
+		if (null == blogName) {
+			ctx.response().setStatusCode(400).setStatusMessage("Nothing to update.").end();
+			return;
+		}
+		logger.info("Updating " + blogName);
+
+		try {
+			JsonArray jsonUsers = new JsonArray().add(ctx.getBodyAsJson());
 			@SuppressWarnings("unused")
 			Message<JsonArray> saved = awaitResult(h -> vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, h));
 			ctx.response().setStatusCode(200).end();

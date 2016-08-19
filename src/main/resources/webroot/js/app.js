@@ -1,27 +1,9 @@
-var myTumble = angular.module('myTumble', [ 'ui.router' ]).config(
-        [ '$stateProvider', '$urlRouterProvider', function($stateProvider, $urlRouterProvider) {
-            $urlRouterProvider.otherwise('/');
-            $stateProvider.state('home', {
-                url : '/',
+var myTumble = angular.module('myTumble', [ 'ngRoute' ]).config(
+        [ '$routeProvider', function($routeProvider) {
+            $routeProvider.when('/', {
                 templateUrl : '/tpl/users.html',
-                controller : 'Followers'
-            }).state('lastlikers', {
-                url : '/lastlikers',
-                templateUrl : '/tpl/users.html',
-                controller : 'LastLikers'
-            }).state('baddies', {
-                url : '/baddies',
-                templateUrl : '/tpl/users.html',
-                controller : 'Baddies'
-            }).state('specials', {
-                url : '/specials',
-                templateUrl : '/tpl/users.html',
-                controller : 'Specials'
-            }).state('notfollowme', {
-                url : '/notfollowme',
-                templateUrl : '/tpl/users.html',
-                controller : 'NotFollowMe'
-            });
+                controller : 'Users'
+            }).otherwise('/');
         } ]);
 
 myTumble.factory('MyBackend', [ '$http', function($http) {
@@ -29,13 +11,24 @@ myTumble.factory('MyBackend', [ '$http', function($http) {
     MyBackend.getUsers = function(filter) {
         return $http.get('/api/users' + filter);
     };
+    MyBackend.updateUser = function(user) {
+        return $http.put('/api/users/' + user.name, user);
+    };
     return MyBackend;
 } ]);
 
-myTumble.controller('Followers', [ '$scope', 'MyBackend', function($scope, MyBackend) {
+myTumble.controller('Users', [ '$scope', 'MyBackend', function($scope, MyBackend) {
     MyBackend.getUsers('?filter=followme,notbad').success(function(data) {
         $scope.users = data;
     });
+
+    $scope.updateUser = function(workUser) {
+        MyBackend.updateUser(workUser).then(function(response) {
+            $scope.status = 'Updated user!';
+        }, function(error) {
+            $scope.status = 'Unable to update user: ' + error.message;
+        });
+    };
 } ]);
 
 myTumble.controller('Specials', [ '$scope', 'MyBackend', function($scope, MyBackend) {
@@ -44,14 +37,14 @@ myTumble.controller('Specials', [ '$scope', 'MyBackend', function($scope, MyBack
     });
 } ]);
 
-myTumble.controller('Baddies', [ '$scope', 'MyBackend', function($scope, MyBackend) {
-    MyBackend.getUsers('?filter=bad').success(function(data) {
+myTumble.controller('Weirdos', [ '$scope', 'MyBackend', function($scope, MyBackend) {
+    MyBackend.getUsers('?filter=weird').success(function(data) {
         $scope.users = data;
     });
 } ]);
 
 myTumble.controller('LastLikers', [ '$scope', 'MyBackend', function($scope, MyBackend) {
-    MyBackend.getUsers('?filter=lastlikers,notbad').success(function(data) {
+    MyBackend.getUsers('?filter=lastlikers,notweird').success(function(data) {
         $scope.users = data;
     });
 } ]);
