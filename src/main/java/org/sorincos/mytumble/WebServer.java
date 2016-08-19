@@ -1,6 +1,7 @@
 package org.sorincos.mytumble;
 
 import static io.vertx.ext.sync.Sync.awaitResult;
+import static io.vertx.ext.sync.Sync.fiberHandler;
 
 import java.util.List;
 
@@ -38,9 +39,9 @@ public class WebServer extends SyncVerticle {
 		router.route().handler(BodyHandler.create());
 
 		// trigger refreshing of data
-		router.put("/api/status/refreshfollowers").handler(this::refreshFollowers);
-		router.put("/api/status/refreshposts").handler(this::refreshPosts);
-		router.post("/api/unfollow").handler(this::unfollowBlog);
+		router.put("/api/status/refreshfollowers").handler(fiberHandler(this::refreshFollowers));
+		router.put("/api/status/refreshposts").handler(fiberHandler(this::refreshPosts));
+		router.post("/api/unfollow").handler(fiberHandler(this::unfollowBlog));
 
 		// getting cached data
 		router.get("/api/users").handler(this::getUsers);
@@ -107,6 +108,7 @@ public class WebServer extends SyncVerticle {
 		});
 	}
 
+	@Suspendable
 	private void refreshFollowers(RoutingContext ctx) {
 		JsonArray params = new JsonArray();
 		String howMany = ctx.request().getParam("howmany");
@@ -129,6 +131,7 @@ public class WebServer extends SyncVerticle {
 		}
 	}
 
+	@Suspendable
 	private void refreshPosts(RoutingContext ctx) {
 		JsonArray params = new JsonArray();
 		String howMany = ctx.request().getParam("howmany");
