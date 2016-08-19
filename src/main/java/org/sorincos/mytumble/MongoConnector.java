@@ -43,28 +43,32 @@ public class MongoConnector extends SyncVerticle {
 		vertx.getOrCreateContext().put("mongoclient", mongo);
 
 		EventBus eb = vertx.eventBus();
-		eb.<JsonArray>consumer("mytumble.mongo.savefollowers").handler(this::saveFollowers);
-		eb.<JsonArray>consumer("mytumble.mongo.getfollowers").handler(this::getFollowers);
+		eb.<JsonArray>consumer("mytumble.mongo.saveusers").handler(this::saveUsers);
+		eb.<JsonArray>consumer("mytumble.mongo.getusers").handler(this::getUsers);
 		eb.<JsonArray>consumer("mytumble.mongo.saveposts").handler(this::savePosts);
 		eb.<JsonArray>consumer("mytumble.mongo.getposts").handler(this::getPosts);
 		eb.<String>consumer("mytumble.mongo.unfollowblog").handler(this::unfollowBlog);
 	}
 
 	@Suspendable
-	private void saveFollowers(Message<JsonArray> msg) {
+	private void saveUsers(Message<JsonArray> msg) {
 		vertx.<JsonArray>executeBlocking(fiberHandler(future -> {
 			try {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 				UpdateOptions options = new UpdateOptions().setUpsert(true);
-				ArrayList<Object> followers = Lists.newArrayList(msg.body());
-				for (Object follower : followers) {
-					JsonObject upsert = new JsonObject().put("$set", (JsonObject) follower);
+				ArrayList<Object> users = Lists.newArrayList(msg.body());
+				int total = users.size();
+				for (Object user : users) {
+					JsonObject upsert = new JsonObject().put("$set", (JsonObject) user);
 					// await, to not kill Mongo's thread pool
-					MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("followers",
+					MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("users",
 					    new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options, h));
-					logger.info("done call: " + res.getDocModified());
+					logger.info("Users upsert: " + res.getDocModified());
+					total -= res.getDocModified();
 				}
-				logger.info("byes");
+				if (total > 0) {
+					future.fail("Some users failed to update: " + total + " of " + users.size());
+				}
 				future.complete();
 			} catch (Exception ex) {
 				ex.printStackTrace();
@@ -79,6 +83,7 @@ public class MongoConnector extends SyncVerticle {
 		});
 	}
 
+	@Deprecated
 	@Suspendable
 	private void savePosts(Message<JsonArray> msg) {
 		vertx.<JsonArray>executeBlocking(fiberHandler(future -> {
@@ -86,12 +91,16 @@ public class MongoConnector extends SyncVerticle {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 				UpdateOptions options = new UpdateOptions().setUpsert(true);
 				ArrayList<Object> posts = Lists.newArrayList(msg.body());
+				int total = posts.size();
 				for (Object post : posts) {
 					JsonObject upsert = new JsonObject().put("$set", (JsonObject) post);
 					// await, to not kill Mongo's thread pool with the foreach
 					MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("posts",
 					    new JsonObject().put("postid", upsert.getJsonObject("$set").getLong("postid")), upsert, options, h));
-					logger.info("done call: " + res.getDocModified());
+					total -= res.getDocModified();
+				}
+				if (total > 0) {
+					future.fail("Some posts failed to update: " + total + " of " + posts.size());
 				}
 				future.complete();
 			} catch (Exception ex) {
@@ -107,17 +116,17 @@ public class MongoConnector extends SyncVerticle {
 		});
 	}
 
-	private void getFollowers(Message<JsonArray> msg) {
+	private void getUsers(Message<JsonArray> msg) {
 		JsonObject query = createQueryFromFilters(msg.body());
 		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-			client.find("followers", query, res -> {
+			client.find("users", query, res -> {
 				if (res.failed()) {
 					future.fail(res.cause().getLocalizedMessage());
 				}
-				final JsonArray followers = new JsonArray();
-				res.result().forEach(followers::add);
-				future.complete(followers);
+				final JsonArray users = new JsonArray();
+				res.result().forEach(users::add);
+				future.complete(users);
 			});
 		}, result -> {
 			if (result.succeeded()) {
@@ -128,6 +137,7 @@ public class MongoConnector extends SyncVerticle {
 		});
 	}
 
+	@Deprecated
 	private void getPosts(Message<JsonArray> msg) {
 		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
@@ -151,23 +161,24 @@ public class MongoConnector extends SyncVerticle {
 		});
 	}
 
-	private void unfollowBlog(Message<String> msg) {
+	@Deprecated
+	private void unfollowBlog(Message<String> msg) { // TODO use a general updateUser() and move logic upwards
 		vertx.<String>executeBlocking(future -> {
 			String blogName = msg.body();
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-			client.find("followers", new JsonObject().put("name", blogName), res -> {
+			client.find("users", new JsonObject().put("name", blogName), res -> {
 				if (res.failed()) {
 					future.fail(res.cause().getLocalizedMessage());
 				}
 				if (1 != res.result().size()) {
 					future.fail("Found " + res.result().size() + " results for " + blogName);
 				}
-				JsonObject follower = res.result().get(0);
-				follower.put("special", false);
-				follower.put("is_followed", false);
-				JsonObject update = new JsonObject().put("$set", (JsonObject) follower);
+				JsonObject user = res.result().get(0);
+				user.put("special", false);
+				user.put("ifollow", false);
+				JsonObject update = new JsonObject().put("$set", (JsonObject) user);
 				UpdateOptions options = new UpdateOptions();
-				client.updateCollectionWithOptions("followers",
+				client.updateCollectionWithOptions("users",
 				    new JsonObject().put("name", update.getJsonObject("$set").getString("name")), update, options, updated -> {
 					    if (updated.failed()) {
 						    future.fail(updated.cause().getLocalizedMessage());
