@@ -1,5 +1,7 @@
 package org.sorincos.mytumble;
 
+import static io.vertx.ext.sync.Sync.awaitResult;
+
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -9,11 +11,13 @@ import org.springframework.stereotype.Component;
 
 import com.google.common.base.Splitter;
 
-import io.vertx.core.AbstractVerticle;
+import co.paralleluniverse.fibers.Suspendable;
 import io.vertx.core.eventbus.DeliveryOptions;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.sync.SyncVerticle;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
@@ -21,7 +25,7 @@ import io.vertx.ext.web.handler.StaticHandler;
 
 @Component
 @ConfigurationProperties(prefix = "web")
-public class WebServer extends AbstractVerticle {
+public class WebServer extends SyncVerticle {
 
 	static final Logger logger = LoggerFactory.getLogger(WebServer.class);
 	private final DeliveryOptions options = new DeliveryOptions().setSendTimeout(5 * 60 * 1000); // 5 minutes, just
@@ -76,10 +80,9 @@ public class WebServer extends AbstractVerticle {
 
 	private void getUsers(RoutingContext ctx) {
 		String filter = ctx.request().getParam("filter");
-		JsonArray params = parseParameters(filter);
-		logger.info("Get " + ((params.size() == 0) ? "" : filter) + " users");
+		logger.info("Get " + ((filter.length() == 0) ? "" : filter) + " users");
 
-		vertx.eventBus().send("mytumble.mongo.getusers", params, options, result -> {
+		vertx.eventBus().send("mytumble.mongo.getusers", createFilter(filter), options, result -> {
 			if (result.failed()) {
 				ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
 				return;
@@ -113,20 +116,12 @@ public class WebServer extends AbstractVerticle {
 		logger.info("Refresh" + ((params.size() == 0) ? "" : (" latest " + Integer.valueOf(howMany))) + " followers");
 
 		try {
-			vertx.eventBus().send("mytumble.tumblr.loadfollowers", params, options, loaded -> {
-				if (loaded.failed()) {
-					ctx.response().setStatusCode(500).setStatusMessage(loaded.cause().getLocalizedMessage()).end();
-					return;
-				}
-				vertx.eventBus().send("mytumble.mongo.saveusers", loaded.result().body(), saved -> {
-					if (saved.failed()) {
-						ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
-						return;
-					}
-					ctx.response().setStatusCode(200).end();
-					return;
-				});
-			});
+			Message<JsonArray> loaded = awaitResult(
+			    h -> vertx.eventBus().send("mytumble.tumblr.loadfollowers", params, options, h));
+			@SuppressWarnings("unused")
+			Message<JsonArray> saved = awaitResult(h -> vertx.eventBus().send("mytumble.mongo.saveusers", loaded.body(), h));
+			ctx.response().setStatusCode(200).end();
+			return;
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
@@ -142,28 +137,19 @@ public class WebServer extends AbstractVerticle {
 		}
 		logger.info("Refresh latest " + ((null == howMany) ? "" : Integer.valueOf(howMany)) + " posts");
 		params.add(Integer.valueOf(howMany));
-		vertx.eventBus().send("mytumble.tumblr.loadposts", params, loaded -> {
-			if (loaded.failed()) {
-				ctx.response().setStatusCode(500).setStatusMessage(loaded.cause().getLocalizedMessage()).end();
-				return;
-			}
-			try {
-				vertx.eventBus().send("mytumble.mongo.saveposts", loaded.result().body(), saved -> {
-					if (saved.failed()) {
-						ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
-						return;
-					}
-					ctx.response().setStatusCode(200).end();
-					return;
-				});
-			} catch (Exception ex) {
-				ex.printStackTrace();
-				ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
-				return;
-			}
-		});
+		try {
+			Message<JsonArray> loaded = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.loadposts", params, h));
+			@SuppressWarnings("unused")
+			Message<JsonArray> saved = awaitResult(h -> vertx.eventBus().send("mytumble.mongo.saveposts", loaded.body(), h));
+			ctx.response().setStatusCode(200).end();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+			return;
+		}
 	}
 
+	@Suspendable
 	private void unfollowBlog(RoutingContext ctx) {
 		String blogName = ctx.request().getParam("name");
 		if (null == blogName) {
@@ -173,21 +159,14 @@ public class WebServer extends AbstractVerticle {
 		logger.info("Unfollowing " + blogName);
 
 		try {
-			vertx.eventBus().send("mytumble.tumblr.unfollowblog", blogName, unfollowed -> {
-				if (unfollowed.failed()) {
-					ctx.response().setStatusCode(500).setStatusMessage(unfollowed.cause().getLocalizedMessage()).end();
-					return;
-				}
-				JsonArray jsonUsers = new JsonArray().add(new JsonObject().put("name", blogName).put("ifollow", false));
-				vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, saved -> {
-					if (saved.failed()) {
-						ctx.response().setStatusCode(500).setStatusMessage(saved.cause().getLocalizedMessage()).end();
-						return;
-					}
-					ctx.response().setStatusCode(200).end();
-					return;
-				});
-			});
+			@SuppressWarnings("unused") // alternative was casting h to (Consumer<Handler<AsyncResult<Message<String>>>>)...
+			Message<String> unfollowed = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.unfollowblog", blogName, h));
+
+			JsonArray jsonUsers = new JsonArray().add(new JsonObject().put("name", blogName).put("ifollow", false));
+			@SuppressWarnings("unused")
+			Message<JsonArray> saved = awaitResult(h -> vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, h));
+			ctx.response().setStatusCode(200).end();
+			return;
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
@@ -195,7 +174,7 @@ public class WebServer extends AbstractVerticle {
 		}
 	}
 
-	private JsonArray parseParameters(String parameters) {
+	private JsonArray createFilter(String parameters) {
 		List<String> filters = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(parameters);
 		JsonArray params = new JsonArray();
 		for (String filter : filters) {
