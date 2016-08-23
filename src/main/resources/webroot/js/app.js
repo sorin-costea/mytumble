@@ -18,10 +18,21 @@ myTumble.factory('MyBackend', [ '$http', function($http) {
 } ]);
 
 myTumble.controller('Users', [ '$scope', 'MyBackend', function($scope, MyBackend) {
-    MyBackend.getUsers('?filter=followme,notbad').success(function(data) {
-        $scope.users = data;
-    });
+    $scope.pageTitle = 'Users list';
+    $scope.userfilter = '';
 
+    $scope.loadUsers = function(filter) {
+        if(filter === $scope.userfilter)
+            return;
+        MyBackend.getUsers('?filter=' + filter).then(function(response) {
+            $scope.userfilter = filter;
+            $scope.users = response.data;
+            $scope.pageStatus = $scope.userFilter;
+        }, function(error) {
+            $scope.pageStatus = 'Failed to load users ('  + $scope.userFilter + '): ' + error.message;
+        });
+    };
+    
     $scope.updateUser = function(workUser) {
         MyBackend.updateUser(workUser).then(function(response) {
             $scope.status = 'Updated user!';
@@ -29,28 +40,6 @@ myTumble.controller('Users', [ '$scope', 'MyBackend', function($scope, MyBackend
             $scope.status = 'Unable to update user: ' + error.message;
         });
     };
-} ]);
-
-myTumble.controller('Specials', [ '$scope', 'MyBackend', function($scope, MyBackend) {
-    MyBackend.getUsers('?filter=special').success(function(data) {
-        $scope.users = data;
-    });
-} ]);
-
-myTumble.controller('Weirdos', [ '$scope', 'MyBackend', function($scope, MyBackend) {
-    MyBackend.getUsers('?filter=weird').success(function(data) {
-        $scope.users = data;
-    });
-} ]);
-
-myTumble.controller('LastLikers', [ '$scope', 'MyBackend', function($scope, MyBackend) {
-    MyBackend.getUsers('?filter=lastlikers,notweird').success(function(data) {
-        $scope.users = data;
-    });
-} ]);
-
-myTumble.controller('NotFollowMe', [ '$scope', 'MyBackend', function($scope, MyBackend) {
-    MyBackend.getUsers('?filter=notspecial,notfollowme,ifollow').success(function(data) {
-        $scope.users = data;
-    });
+    
+    $scope.loadUsers('followme,notweird');
 } ]);

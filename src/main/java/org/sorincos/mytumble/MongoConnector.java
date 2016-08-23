@@ -197,6 +197,24 @@ public class MongoConnector extends SyncVerticle {
 
 	private JsonObject createQueryFromFilters(JsonArray filters) {
 		JsonObject query = new JsonObject();
+		for (Object filter : filters) {
+			if ("special".compareToIgnoreCase((String) filter) == 0)
+				query.put("special", true);
+			if ("notspecial".compareToIgnoreCase((String) filter) == 0)
+				query.put("special", false);
+			if ("weird".compareToIgnoreCase((String) filter) == 0)
+				query.put("weirdo", true);
+			if ("notweird".compareToIgnoreCase((String) filter) == 0)
+				query.put("weirdo", false);
+			if ("followsme".compareToIgnoreCase((String) filter) == 0)
+				query.put("followsme", true);
+			if ("notfollowsme".compareToIgnoreCase((String) filter) == 0)
+				query.put("followsme", false);
+			if ("ifollow".compareToIgnoreCase((String) filter) == 0)
+				query.put("ifollow", true);
+			if ("notifollow".compareToIgnoreCase((String) filter) == 0)
+				query.put("ifollow", false);
+		}
 		return query;
 	}
 

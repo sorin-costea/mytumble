@@ -1,5 +1,12 @@
-<h2 class="heavy">Big list</h2>
+<h2 class="heavy">{{pageTitle}}</h2>
+<h3 class="heavy">{{pageStatus}}</h2>
 <form>
+  <button ng-click="loadUsers('followsme,notweird')">My followers</button>
+  <button ng-click="loadUsers('special')">Specials</button>
+  <button ng-click="loadUsers('weird')">Weirdos</button>
+  <button ng-click="loadUsers('followsme,notweird,notifollow')">To follow back</button>
+  <button ng-click="loadUsers('notspecial,notfollowsme,ifollow,notweird')">Should be following me</button>
+  <button ng-click="loadUsers('lastlikers,notweird')">Last likers</button>
   <div>
     <div ng-repeat="auser in users" class="tile">
       <table style="width: 150px">
