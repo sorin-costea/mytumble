@@ -18,7 +18,6 @@ myTumble.factory('MyBackend', [ '$http', function($http) {
 } ]);
 
 myTumble.controller('Users', [ '$scope', 'MyBackend', function($scope, MyBackend) {
-    $scope.pageTitle = 'Users list';
     $scope.userfilter = '';
 
     $scope.loadUsers = function(filter) {
@@ -27,7 +26,6 @@ myTumble.controller('Users', [ '$scope', 'MyBackend', function($scope, MyBackend
         MyBackend.getUsers('?filter=' + filter).then(function(response) {
             $scope.userfilter = filter;
             $scope.users = response.data;
-            $scope.pageStatus = $scope.userFilter;
         }, function(error) {
             $scope.pageStatus = 'Failed to load users ('  + $scope.userFilter + '): ' + error.message;
         });
@@ -35,9 +33,9 @@ myTumble.controller('Users', [ '$scope', 'MyBackend', function($scope, MyBackend
     
     $scope.updateUser = function(workUser) {
         MyBackend.updateUser(workUser).then(function(response) {
-            $scope.status = 'Updated user!';
+            $scope.pageStatus = 'Updated user ' + workUser.name;
         }, function(error) {
-            $scope.status = 'Unable to update user: ' + error.message;
+            $scope.pageStatus = 'Unable to update user: ' + error.message;
         });
     };
     
