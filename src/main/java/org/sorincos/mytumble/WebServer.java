@@ -56,8 +56,7 @@ public class WebServer extends SyncVerticle {
 		// error conditions
 		router.put("/api/status").handler(ctx -> {
 			logger.info("Triggering what??");
-			ctx.response().setStatusCode(400).setStatusMessage("What do you wanna trigger? loadFollowers or loadPosts?")
-			    .end();
+			ctx.response().setStatusCode(400).setStatusMessage("What do you wanna trigger?").end();
 			return;
 		});
 		router.get("/api/status").handler(ctx -> {
@@ -150,16 +149,11 @@ public class WebServer extends SyncVerticle {
 
 	@Suspendable
 	private void refreshFollowers(RoutingContext ctx) {
-		JsonArray params = new JsonArray();
-		String howMany = ctx.request().getParam("howmany");
-		if (null != howMany) {
-			params.add(Integer.valueOf(howMany));
-		}
-		logger.info("Refresh" + ((params.size() == 0) ? "" : (" latest " + Integer.valueOf(howMany))) + " followers");
+		logger.info("Refresh followers");
 
 		try {
 			Message<JsonArray> loaded = awaitResult(
-			    h -> vertx.eventBus().send("mytumble.tumblr.loadfollowers", params, options, h));
+			    h -> vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, options, h));
 			@SuppressWarnings("unused")
 			Message<JsonArray> saved = awaitResult(h -> vertx.eventBus().send("mytumble.mongo.saveusers", loaded.body(), h));
 			ctx.response().setStatusCode(200).end();

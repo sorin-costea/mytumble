@@ -17,6 +17,9 @@ myTumble.factory('MyBackend', [ '$http', function($http) {
     MyBackend.unfollowAsocials = function() {
         return $http.put('/api/status/unfollowasocials');
     };
+    MyBackend.refreshFollowers = function() {
+        return $http.put('/api/status/refreshfollowers');
+    };
     MyBackend.updateUser = function(user) {
         return $http.put('/api/users/' + user.name, user);
     };
@@ -58,6 +61,14 @@ myTumble.controller('Users', [ '$scope', 'MyBackend', function($scope, MyBackend
             $scope.pageStatus = 'Unfollowed those who don\'t follow back';
         }, function(error) {
             $scope.pageStatus = 'Failed to unfollow users: ' + error.message;
+        });
+    };
+
+    $scope.refreshFollowers = function() {
+        MyBackend.refreshFollowers().then(function(response) {
+            $scope.pageStatus = 'Refreshing the followers database';
+        }, function(error) {
+            $scope.pageStatus = 'Failed to refresh followers: ' + error.message;
         });
     };
     
