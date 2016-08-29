@@ -90,12 +90,10 @@ public class WebServer extends SyncVerticle {
 				    ((JsonObject) notFollower).put("ifollow", false); // and mark for db update
 				    notAFollowers.add((JsonObject) notFollower);
 			    }
-			    @SuppressWarnings("unused")
-			    Message<JsonArray> save = awaitResult(
-			        h -> vertx.eventBus().send("mytumble.mongo.saveusers", notAFollowers, h)); // remember
-			    ctx.response().setStatusCode(200).end();
-			    return;
+			    vertx.eventBus().send("mytumble.mongo.saveusers", notAFollowers, save -> { // remember
+			    });
 		    }));
+		ctx.response().setStatusCode(200).end();
 	}
 
 	@Suspendable
@@ -110,12 +108,11 @@ public class WebServer extends SyncVerticle {
 			ArrayList<Object> likers = Lists.newArrayList((JsonArray) result.result().body());
 			for (Object liker : likers) {
 				@SuppressWarnings("unused")
-				Message<String> res = awaitResult(
+				Message<String> res = awaitResult( // serial for safety
 				    h -> vertx.eventBus().send("mytumble.tumblr.likelatest", ((JsonObject) liker).getString("name"), h));
 			}
-			ctx.response().setStatusCode(200).end();
-			return;
 		}));
+		ctx.response().setStatusCode(200).end();
 	}
 
 	private void getUsers(RoutingContext ctx) {
@@ -152,12 +149,12 @@ public class WebServer extends SyncVerticle {
 		logger.info("Refresh followers");
 
 		try {
-			@SuppressWarnings("unused")
-			Message<Void> resetted = awaitResult(h -> vertx.eventBus().send("mytumble.mongo.resetfollowers", null, h));
-			Message<JsonArray> loaded = awaitResult(
-			    h -> vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, options, h));
-			@SuppressWarnings("unused")
-			Message<JsonArray> saved = awaitResult(h -> vertx.eventBus().send("mytumble.mongo.saveusers", loaded.body(), h));
+			vertx.eventBus().send("mytumble.mongo.resetfollowers", null, resetted -> {
+				vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, options, loaded -> {
+					vertx.eventBus().send("mytumble.mongo.saveusers", loaded.result().body(), saved -> {
+					});
+				});
+			});
 			ctx.response().setStatusCode(200).end();
 			return;
 		} catch (Exception ex) {
