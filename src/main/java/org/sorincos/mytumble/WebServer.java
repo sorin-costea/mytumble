@@ -152,6 +152,8 @@ public class WebServer extends SyncVerticle {
 		logger.info("Refresh followers");
 
 		try {
+			@SuppressWarnings("unused")
+			Message<Void> resetted = awaitResult(h -> vertx.eventBus().send("mytumble.mongo.resetfollowers", null, h));
 			Message<JsonArray> loaded = awaitResult(
 			    h -> vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, options, h));
 			@SuppressWarnings("unused")

@@ -46,9 +46,33 @@ public class MongoConnector extends SyncVerticle {
 		eb.<JsonArray>consumer("mytumble.mongo.saveusers").handler(this::saveUsers);
 		eb.<JsonArray>consumer("mytumble.mongo.getusers").handler(this::getUsers);
 		eb.<JsonArray>consumer("mytumble.mongo.getuser").handler(this::getUser);
+		eb.<String>consumer("mytumble.mongo.resetfollowers").handler(this::resetFollowers);
 
 		eb.<JsonArray>consumer("mytumble.mongo.saveposts").handler(this::savePosts);
 		eb.<JsonArray>consumer("mytumble.mongo.getposts").handler(this::getPosts);
+	}
+
+	@Suspendable
+	private void resetFollowers(Message<String> msg) {
+		vertx.<String>executeBlocking(fiberHandler(future -> {
+			try {
+				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
+				JsonObject update = new JsonObject().put("$set", new JsonObject().put("followsme", false));
+				MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("users", new JsonObject(),
+				    update, new UpdateOptions().setMulti(true), h));
+				logger.info("Users upsert: " + res.getDocModified());
+				future.complete("Users upsert: " + res.getDocModified());
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				future.fail(ex.getLocalizedMessage());
+			}
+		}), result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().getLocalizedMessage());
+			}
+		});
 	}
 
 	@Suspendable
