@@ -83,30 +83,77 @@ public class TumblrConnector extends AbstractVerticle {
 
 		eb.<JsonArray>consumer("mytumble.tumblr.loadfollowers").handler(this::loadFollowers);
 		eb.<JsonArray>consumer("mytumble.tumblr.loadposts").handler(this::loadPosts);
+		eb.<String>consumer("mytumble.tumblr.likelatest").handler(this::likeLatest);
+		eb.<String>consumer("mytumble.tumblr.followblog").handler(this::followBlog);
 		eb.<String>consumer("mytumble.tumblr.unfollowblog").handler(this::unfollowBlog);
 	}
 
-	private void unfollowBlog(Message<String> msg) {
+	private void likeLatest(Message<String> msg) {
 		vertx.<String>executeBlocking(future -> {
-			logger.info("Unfollow " + blogname);
+			String toLike = msg.body();
+			logger.info("Liking latest post of " + toLike);
 			try {
 				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
 				if (null == client) {
 					future.fail("Error: Jumblr not initialized");
 				}
-				Blog myBlog = null;
-				for (Blog blog : client.user().getBlogs()) {
-					if (0 == blog.getName().compareTo(blogname)) {
-						myBlog = blog;
-						break;
+				Map<String, Object> params = new HashMap<String, Object>();
+				List<Post> posts = client.blogPosts(toLike, params);
+				for (Post post : posts) {
+					if (null == post.getSourceUrl()) { // no use to like reblogs
+						client.like(post.getId(), post.getReblogKey());
+						logger.info("Liked " + post.getId());
+						break; // like only latest own post
 					}
 				}
-				if (null == myBlog) {
-					future.fail("Error: Blog name not found - " + blogname);
-				}
-				String toUnfollow = msg.body();
-				client.unfollow(toUnfollow); // no return here
+				future.complete(toLike);
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				future.fail(ex.getLocalizedMessage());
+			}
+		}, result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().getLocalizedMessage());
+			}
+		});
+	}
 
+	private void followBlog(Message<String> msg) {
+		vertx.<String>executeBlocking(future -> {
+			String toFollow = msg.body();
+			logger.info("Follow " + toFollow);
+			try {
+				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
+				if (null == client) {
+					future.fail("Error: Jumblr not initialized");
+				}
+				client.follow(toFollow); // no return here
+				future.complete(toFollow);
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				future.fail(ex.getLocalizedMessage());
+			}
+		}, result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().getLocalizedMessage());
+			}
+		});
+	}
+
+	private void unfollowBlog(Message<String> msg) {
+		vertx.<String>executeBlocking(future -> {
+			String toUnfollow = msg.body();
+			logger.info("Unfollow " + toUnfollow);
+			try {
+				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
+				if (null == client) {
+					future.fail("Error: Jumblr not initialized");
+				}
+				client.unfollow(toUnfollow); // no return here
 				future.complete(toUnfollow);
 			} catch (Exception ex) {
 				ex.printStackTrace();

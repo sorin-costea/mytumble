@@ -11,6 +11,12 @@ myTumble.factory('MyBackend', [ '$http', function($http) {
     MyBackend.getUsers = function(filter) {
         return $http.get('/api/users' + filter);
     };
+    MyBackend.likeLikers = function() {
+        return $http.put('/api/status/likelikers');
+    };
+    MyBackend.unfollowAsocials = function() {
+        return $http.put('/api/status/unfollowasocials');
+    };
     MyBackend.updateUser = function(user) {
         return $http.put('/api/users/' + user.name, user);
     };
@@ -36,6 +42,22 @@ myTumble.controller('Users', [ '$scope', 'MyBackend', function($scope, MyBackend
             $scope.pageStatus = 'Updated user ' + workUser.name;
         }, function(error) {
             $scope.pageStatus = 'Unable to update user: ' + error.message;
+        });
+    };
+    
+    $scope.likeLikers = function() {
+        MyBackend.likeLikers().then(function(response) {
+            $scope.pageStatus = 'Liked users';
+        }, function(error) {
+            $scope.pageStatus = 'Failed to like users: ' + error.message;
+        });
+    };
+    
+    $scope.unfollowAsocials = function() {
+        MyBackend.unfollowAsocials().then(function(response) {
+            $scope.pageStatus = 'Unfollowed those who don\'t follow back';
+        }, function(error) {
+            $scope.pageStatus = 'Failed to unfollow users: ' + error.message;
         });
     };
     

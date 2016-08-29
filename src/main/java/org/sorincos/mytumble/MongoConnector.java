@@ -45,9 +45,10 @@ public class MongoConnector extends SyncVerticle {
 		EventBus eb = vertx.eventBus();
 		eb.<JsonArray>consumer("mytumble.mongo.saveusers").handler(this::saveUsers);
 		eb.<JsonArray>consumer("mytumble.mongo.getusers").handler(this::getUsers);
+		eb.<JsonArray>consumer("mytumble.mongo.getuser").handler(this::getUser);
+
 		eb.<JsonArray>consumer("mytumble.mongo.saveposts").handler(this::savePosts);
 		eb.<JsonArray>consumer("mytumble.mongo.getposts").handler(this::getPosts);
-		eb.<String>consumer("mytumble.mongo.unfollowblog").handler(this::unfollowBlog);
 	}
 
 	@Suspendable
@@ -137,20 +138,17 @@ public class MongoConnector extends SyncVerticle {
 		});
 	}
 
-	@Deprecated
-	private void getPosts(Message<JsonArray> msg) {
+	private void getUser(Message<JsonArray> msg) {
+		JsonObject query = new JsonObject().put("name", msg.body().getString(0));
 		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-			@SuppressWarnings("unused")
-			Void v = awaitResult(h -> client.createCollection("zzzz", h));
-			System.out.println("and");
-			client.find("posts", new JsonObject(), res -> {
+			client.find("users", query, res -> {
 				if (res.failed()) {
 					future.fail(res.cause().getLocalizedMessage());
 				}
-				final JsonArray posts = new JsonArray();
-				res.result().forEach(posts::add);
-				future.complete(posts);
+				final JsonArray users = new JsonArray();
+				res.result().forEach(users::add); // expected max one
+				future.complete(users);
 			});
 		}, result -> {
 			if (result.succeeded()) {
@@ -162,29 +160,17 @@ public class MongoConnector extends SyncVerticle {
 	}
 
 	@Deprecated
-	private void unfollowBlog(Message<String> msg) { // TODO use a general updateUser() and move logic upwards
-		vertx.<String>executeBlocking(future -> {
-			String blogName = msg.body();
+	private void getPosts(Message<JsonArray> msg) {
+		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-			client.find("users", new JsonObject().put("name", blogName), res -> {
+			System.out.println("and");
+			client.find("posts", new JsonObject(), res -> {
 				if (res.failed()) {
 					future.fail(res.cause().getLocalizedMessage());
 				}
-				if (1 != res.result().size()) {
-					future.fail("Found " + res.result().size() + " results for " + blogName);
-				}
-				JsonObject user = res.result().get(0);
-				user.put("special", false);
-				user.put("ifollow", false);
-				JsonObject update = new JsonObject().put("$set", (JsonObject) user);
-				UpdateOptions options = new UpdateOptions();
-				client.updateCollectionWithOptions("users",
-				    new JsonObject().put("name", update.getJsonObject("$set").getString("name")), update, options, updated -> {
-					    if (updated.failed()) {
-						    future.fail(updated.cause().getLocalizedMessage());
-					    }
-				    });
-				future.complete();
+				final JsonArray posts = new JsonArray();
+				res.result().forEach(posts::add);
+				future.complete(posts);
 			});
 		}, result -> {
 			if (result.succeeded()) {
@@ -214,6 +200,8 @@ public class MongoConnector extends SyncVerticle {
 				query.put("ifollow", true);
 			if ("notifollow".compareToIgnoreCase((String) filter) == 0)
 				query.put("ifollow", false);
+			if ("likers".compareToIgnoreCase((String) filter) == 0)
+				query.put("liker", true);
 		}
 		return query;
 	}
