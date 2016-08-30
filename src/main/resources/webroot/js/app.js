@@ -29,49 +29,60 @@ myTumble.controller('Users', [
         '$scope',
         'MyBackend',
         function($scope, MyBackend) {
+            $scope.messages = [];
             $scope.userfilter = '';
             $scope.eb = null;
+
+            $scope.addLog = function(text) {
+                var message = {
+                    "timestamp" : Date.now(),
+                    "text" : text
+                };
+                $scope.messages.unshift(message);
+            }
 
             $scope.loadUsers = function(filter) {
                 if (filter === $scope.userfilter)
                     return;
+                $scope.addLog('Loading users (' + filter + ')');
                 MyBackend.getUsers('?filter=' + filter).then(function(response) {
                     $scope.userfilter = filter;
                     $scope.users = response.data;
+                    $scope.addLog('Loaded users');
                 }, function(error) {
-                    $scope.pageStatus = 'Failed to load users (' + $scope.userFilter + '): ' + error.message;
+                    $scope.addLog('Failed to load users (' + $scope.userFilter + '): ' + error.message);
                 });
             };
 
             $scope.updateUser = function(workUser) {
+                $scope.addLog('Updating user ' + workUser.name);
                 MyBackend.updateUser(workUser).then(function(response) {
-                    $scope.pageStatus = 'Updated user ' + workUser.name;
                 }, function(error) {
-                    $scope.pageStatus = 'Unable to update user: ' + error.message;
+                    $scope.addLog('Unable to update user: ' + error.message);
                 });
             };
 
             $scope.likeLikers = function() {
+                $scope.addLog('Liking back the likers');
                 MyBackend.likeLikers().then(function(response) {
-                    $scope.pageStatus = 'Liked users';
                 }, function(error) {
-                    $scope.pageStatus = 'Failed to like users: ' + error.message;
+                    $scope.addLog('Failed to like users: ' + error.message);
                 });
             };
 
             $scope.unfollowAsocials = function() {
+                $scope.addLog('Unfollowing those who don\'t follow back');
                 MyBackend.unfollowAsocials().then(function(response) {
-                    $scope.pageStatus = 'Unfollowed those who don\'t follow back';
                 }, function(error) {
-                    $scope.pageStatus = 'Failed to unfollow users: ' + error.message;
+                    $scope.addLog('Failed to unfollow users: ' + error.message);
                 });
             };
 
             $scope.refreshFollowers = function() {
+                $scope.addLog('Refreshing the followers database');
                 MyBackend.refreshFollowers().then(function(response) {
-                    $scope.pageStatus = 'Refreshing the followers database';
                 }, function(error) {
-                    $scope.pageStatus = 'Failed to refresh followers: ' + error.message;
+                    $scope.addLog('Failed to refresh followers: ' + error.message);
                 });
             };
 
@@ -79,7 +90,8 @@ myTumble.controller('Users', [
                     + window.location.port + '/eb');
             $scope.eb.onopen = function() {
                 $scope.eb.registerHandler("mytumble.web.status", function(err, msg) {
-                    console.log('messageee:', msg);
+                    $scope.addLog(msg.body);
+                    $scope.$apply();
                 });
             }
 

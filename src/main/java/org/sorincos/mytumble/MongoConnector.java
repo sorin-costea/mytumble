@@ -47,9 +47,6 @@ public class MongoConnector extends SyncVerticle {
 		eb.<JsonArray>consumer("mytumble.mongo.getusers").handler(this::getUsers);
 		eb.<JsonArray>consumer("mytumble.mongo.getuser").handler(this::getUser);
 		eb.<String>consumer("mytumble.mongo.resetfollowers").handler(this::resetFollowers);
-
-		eb.<JsonArray>consumer("mytumble.mongo.saveposts").handler(this::savePosts);
-		eb.<JsonArray>consumer("mytumble.mongo.getposts").handler(this::getPosts);
 	}
 
 	@Suspendable
@@ -108,39 +105,6 @@ public class MongoConnector extends SyncVerticle {
 		});
 	}
 
-	@Deprecated
-	@Suspendable
-	private void savePosts(Message<JsonArray> msg) {
-		vertx.<JsonArray>executeBlocking(fiberHandler(future -> {
-			try {
-				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-				UpdateOptions options = new UpdateOptions().setUpsert(true);
-				ArrayList<Object> posts = Lists.newArrayList(msg.body());
-				int total = posts.size();
-				for (Object post : posts) {
-					JsonObject upsert = new JsonObject().put("$set", (JsonObject) post);
-					// await, to not kill Mongo's thread pool with the foreach
-					MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("posts",
-					    new JsonObject().put("postid", upsert.getJsonObject("$set").getLong("postid")), upsert, options, h));
-					total -= res.getDocModified();
-				}
-				if (total > 0) {
-					future.fail("Some posts failed to update: " + total + " of " + posts.size());
-				}
-				future.complete();
-			} catch (Exception ex) {
-				ex.printStackTrace();
-				future.fail(ex.getLocalizedMessage());
-			}
-		}), result -> {
-			if (result.succeeded()) {
-				msg.reply(result.result());
-			} else {
-				msg.fail(1, result.cause().getLocalizedMessage());
-			}
-		});
-	}
-
 	private void getUsers(Message<JsonArray> msg) {
 		JsonObject query = createQueryFromFilters(msg.body());
 		vertx.<JsonArray>executeBlocking(future -> {
@@ -173,28 +137,6 @@ public class MongoConnector extends SyncVerticle {
 				final JsonArray users = new JsonArray();
 				res.result().forEach(users::add); // expected max one
 				future.complete(users);
-			});
-		}, result -> {
-			if (result.succeeded()) {
-				msg.reply(result.result());
-			} else {
-				msg.fail(1, result.cause().getLocalizedMessage());
-			}
-		});
-	}
-
-	@Deprecated
-	private void getPosts(Message<JsonArray> msg) {
-		vertx.<JsonArray>executeBlocking(future -> {
-			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-			System.out.println("and");
-			client.find("posts", new JsonObject(), res -> {
-				if (res.failed()) {
-					future.fail(res.cause().getLocalizedMessage());
-				}
-				final JsonArray posts = new JsonArray();
-				res.result().forEach(posts::add);
-				future.complete(posts);
 			});
 		}, result -> {
 			if (result.succeeded()) {

@@ -52,14 +52,12 @@ public class WebServer extends SyncVerticle {
 		router.put("/api/status/refreshfollowers").handler(fiberHandler(this::refreshFollowers));
 		router.put("/api/status/likelikers").handler(fiberHandler(this::likeLikers));
 		router.put("/api/status/unfollowasocials").handler(fiberHandler(this::unfollowAsocials));
-		router.put("/api/status/refreshposts").handler(fiberHandler(this::refreshPosts));
 
 		// modifying stuff
 		router.put("/api/users/:name").handler(fiberHandler(this::updateUser));
 
 		// getting cached data
 		router.get("/api/users").handler(this::getUsers);
-		router.get("/api/posts").handler(this::getPosts);
 
 		// error conditions
 		router.put("/api/status").handler(ctx -> {
@@ -99,7 +97,7 @@ public class WebServer extends SyncVerticle {
 				    notAFollowers.add((JsonObject) notFollower);
 			    }
 			    vertx.eventBus().send("mytumble.mongo.saveusers", notAFollowers, save -> {
-				    vertx.eventBus().send("mytumble.web.status", "unfollow");
+				    vertx.eventBus().send("mytumble.web.status", "Unfollowed");
 			    });
 		    }));
 		ctx.response().setStatusCode(200).end();
@@ -119,7 +117,7 @@ public class WebServer extends SyncVerticle {
 				@SuppressWarnings("unused")
 				Message<String> res = awaitResult( // serial for safety
 				    h -> vertx.eventBus().send("mytumble.tumblr.likelatest", ((JsonObject) liker).getString("name"), h));
-				vertx.eventBus().send("mytumble.web.status", "likers");
+				vertx.eventBus().send("mytumble.web.status", "Liked latest posts");
 			}
 		}));
 		ctx.response().setStatusCode(200).end();
@@ -140,20 +138,6 @@ public class WebServer extends SyncVerticle {
 		});
 	}
 
-	@Deprecated
-	private void getPosts(RoutingContext ctx) {
-		logger.info("Get posts");
-		vertx.eventBus().send("mytumble.mongo.getposts", null, result -> {
-			if (result.failed()) {
-				ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-				return;
-			}
-			ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-			ctx.response().end(((JsonArray) result.result().body()).encode());
-			return;
-		});
-	}
-
 	@Suspendable
 	private void refreshFollowers(RoutingContext ctx) {
 		logger.info("Refresh followers");
@@ -161,35 +145,17 @@ public class WebServer extends SyncVerticle {
 		try {
 			vertx.eventBus().send("mytumble.mongo.resetfollowers", null, resetted -> {
 				vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, options, loaded -> {
-					vertx.eventBus().send("mytumble.mongo.saveusers", loaded.result().body(), saved -> {
-						vertx.eventBus().send("mytumble.web.status", "refreshed");
-					});
+					if (loaded.succeeded()) {
+						vertx.eventBus().send("mytumble.mongo.saveusers", loaded.result().body(), saved -> {
+							vertx.eventBus().send("mytumble.web.status", "Refreshed from Tumblr");
+						});
+					} else {
+						vertx.eventBus().send("mytumble.web.status", "Refresh failed: " + loaded.cause().getLocalizedMessage());
+					}
 				});
 			});
 			ctx.response().setStatusCode(200).end();
 			return;
-		} catch (Exception ex) {
-			ex.printStackTrace();
-			ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
-			return;
-		}
-	}
-
-	@Deprecated
-	@Suspendable
-	private void refreshPosts(RoutingContext ctx) {
-		JsonArray params = new JsonArray();
-		String howMany = ctx.request().getParam("howmany");
-		if (null == howMany) {
-			howMany = "10";
-		}
-		logger.info("Refresh latest " + ((null == howMany) ? "" : Integer.valueOf(howMany)) + " posts");
-		params.add(Integer.valueOf(howMany));
-		try {
-			Message<JsonArray> loaded = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.loadposts", params, h));
-			@SuppressWarnings("unused")
-			Message<JsonArray> saved = awaitResult(h -> vertx.eventBus().send("mytumble.mongo.saveposts", loaded.body(), h));
-			ctx.response().setStatusCode(200).end();
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
@@ -227,7 +193,7 @@ public class WebServer extends SyncVerticle {
 						if (h.failed()) {
 							logger.info("Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
 						}
-						vertx.eventBus().send("mytumble.web.status", "likers");
+						vertx.eventBus().send("mytumble.web.status", "Updated user " + toUpdate);
 					});
 				}
 			});

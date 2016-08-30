@@ -1,25 +1,36 @@
 <form>
   <h2 class="heavy">Users list</h2>
-  <button ng-click="loadUsers('followsme,notweird')">My followers</button>
+  <button ng-click="loadUsers('followsme,notweird')">My
+    followers</button>
   <button ng-click="loadUsers('special')">Specials</button>
   <button ng-click="loadUsers('weird')">Weirdos</button>
-  <button ng-click="loadUsers('followsme,notweird,notifollow')">To follow back</button>
-  <button ng-click="loadUsers('notspecial,notfollowsme,ifollow,notweird')">Should be following me</button>
+  <button ng-click="loadUsers('followsme,notweird,notifollow')">To
+    follow back</button>
+  <button
+    ng-click="loadUsers('notspecial,notfollowsme,ifollow,notweird')"
+  >Should be following me</button>
   <button ng-click="unfollowAsocials()">Unfollow asocials</button>
   <button ng-click="loadUsers('likers,notweird')">Likers</button>
   <button ng-click="likeLikers()">Like likers</button>
   <button ng-click="refreshFollowers()">Refresh followers</button>
+  <div ng-repeat="message in messages">{{ message.timestamp |
+    date:'HH:mm:ss.sss'}}: {{ message.text }}</div>
   <div>
     <div ng-repeat="auser in users" class="tile">
       <table style="width: 150px">
         <tr>
-          <td colspan="2"><p class="oneline heavy">{{auser.name}} <img src="img/follows.png" ng-show="auser.followsme"/></p></td>
+          <td colspan="2"><p class="oneline heavy">
+              {{auser.name}} <img src="img/follows.png"
+                ng-show="auser.followsme"
+              />
+            </p></td>
         </tr>
         <tr>
           <td rowspan="4" width="48px"><img src="img/smiley.png" /></td>
           <td><div>
               <input type="checkbox" ng-model="auser.special"
-                id="special-{{auser.name}}" ng-change="updateUser(auser)"
+                id="special-{{auser.name}}"
+                ng-change="updateUser(auser)"
               /> <label for="special-{{auser.name}}">Special</label>
             </div></td>
         </tr>
@@ -40,7 +51,8 @@
         <tr>
           <td><div>
               <input type="checkbox" ng-model="auser.ifollow"
-                id="ifollow-{{auser.name}}" ng-change="updateUser(auser)"
+                id="ifollow-{{auser.name}}"
+                ng-change="updateUser(auser)"
               /> <label for="ifollow-{{auser.name}}">I follow</label>
             </div></td>
         </tr>
