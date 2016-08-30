@@ -64,6 +64,10 @@ button {
   order: -1;
 }
 
+.HolyGrail-ads {
+  font-size: 70%;
+}
+
 @media (min-width: 768px) {
   .HolyGrail-body {
     flex-direction: row;
