@@ -1,2 +1,2 @@
 # mytumble
-Jumblr and vert.x and Spring Boot and... = Tumblr client webapp
+Jumblr and vert.x and Spring Boot and Angular... = Tumblr client webapp
