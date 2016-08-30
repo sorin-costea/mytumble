@@ -25,6 +25,9 @@ import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.StaticHandler;
+import io.vertx.ext.web.handler.sockjs.BridgeOptions;
+import io.vertx.ext.web.handler.sockjs.PermittedOptions;
+import io.vertx.ext.web.handler.sockjs.SockJSHandler;
 
 @Component
 @ConfigurationProperties(prefix = "web")
@@ -38,6 +41,11 @@ public class WebServer extends SyncVerticle {
 	public void start() throws Exception {
 
 		Router router = Router.router(vertx);
+		BridgeOptions sockJsOpts = new BridgeOptions()
+		    .addOutboundPermitted(new PermittedOptions().setAddress("mytumble.web.status"));
+		SockJSHandler sockBridgeHandler = SockJSHandler.create(vertx).bridge(sockJsOpts);
+		router.route("/eb/*").handler(sockBridgeHandler);
+
 		router.route().handler(BodyHandler.create());
 
 		// trigger actions
@@ -90,7 +98,8 @@ public class WebServer extends SyncVerticle {
 				    ((JsonObject) notFollower).put("ifollow", false); // and mark for db update
 				    notAFollowers.add((JsonObject) notFollower);
 			    }
-			    vertx.eventBus().send("mytumble.mongo.saveusers", notAFollowers, save -> { // remember
+			    vertx.eventBus().send("mytumble.mongo.saveusers", notAFollowers, save -> {
+				    vertx.eventBus().send("mytumble.web.status", "unfollow");
 			    });
 		    }));
 		ctx.response().setStatusCode(200).end();
@@ -110,6 +119,7 @@ public class WebServer extends SyncVerticle {
 				@SuppressWarnings("unused")
 				Message<String> res = awaitResult( // serial for safety
 				    h -> vertx.eventBus().send("mytumble.tumblr.likelatest", ((JsonObject) liker).getString("name"), h));
+				vertx.eventBus().send("mytumble.web.status", "likers");
 			}
 		}));
 		ctx.response().setStatusCode(200).end();
@@ -152,6 +162,7 @@ public class WebServer extends SyncVerticle {
 			vertx.eventBus().send("mytumble.mongo.resetfollowers", null, resetted -> {
 				vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, options, loaded -> {
 					vertx.eventBus().send("mytumble.mongo.saveusers", loaded.result().body(), saved -> {
+						vertx.eventBus().send("mytumble.web.status", "refreshed");
 					});
 				});
 			});
@@ -212,11 +223,12 @@ public class WebServer extends SyncVerticle {
 							}
 						});
 					}
-				}
-			});
-			vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, h -> {
-				if (h.failed()) {
-					logger.info("Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
+					vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, h -> {
+						if (h.failed()) {
+							logger.info("Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
+						}
+						vertx.eventBus().send("mytumble.web.status", "likers");
+					});
 				}
 			});
 			ctx.response().setStatusCode(200).end();
