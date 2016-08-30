@@ -30,6 +30,10 @@ body {
 	font-family: Verdana, Geneva, sans-serif;
 }
 
+button {
+  width: 10em;
+}
+
 .tile {
 	display: inline-block;
 	padding: 5px;
@@ -48,4 +52,28 @@ body {
 .heavy {
 	font-style: normal;
 	font-weight: bold;
+}
+
+.HolyGrail,
+.HolyGrail-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.HolyGrail-nav {
+  order: -1;
+}
+
+@media (min-width: 768px) {
+  .HolyGrail-body {
+    flex-direction: row;
+    flex: 1;
+  }
+  .HolyGrail-content {
+    flex: 1;
+  }
+  .HolyGrail-nav, .HolyGrail-ads {
+    /* 12em is the width of the columns */
+    flex: 0 0 12em;
+  }
 }

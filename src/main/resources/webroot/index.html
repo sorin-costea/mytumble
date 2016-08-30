@@ -1,18 +1,88 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset='utf-8'>
-    <title>Follower list</title>
-    <link rel="stylesheet" type="text/css" href="css/app.css">
+<meta charset='utf-8'>
+<title>Follower list</title>
+<link rel="stylesheet" type="text/css" href="css/app.css">
 </head>
-<body>
-	<br>
-	<div class="container" ng-app="myTumble">
-		<div ng-view></div>
-	</div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.5.8/angular.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.5.8/angular-route.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.1/sockjs.js"></script>
+<!-- CSS trick from https://github.com/philipwalton/solved-by-flexbox -->
+<body ng-app="myTumble" ng-controller="Users" class="HolyGrail">
+  <header class="heavy">Users list</header>
+  <div class="HolyGrail-body">
+    <main class="HolyGrail-content">
+      <div ng-repeat="auser in users" class="tile">
+        <table style="width: 150px">
+          <tr>
+            <td colspan="2"><p class="oneline heavy">
+                {{auser.name}} <img src="img/follows.png"
+                  ng-show="auser.followsme"
+                />
+              </p></td>
+          </tr>
+          <tr>
+            <td rowspan="4" width="48px"><img src="img/smiley.png" /></td>
+            <td><div>
+                <input type="checkbox" ng-model="auser.special"
+                  id="special-{{auser.name}}"
+                  ng-change="updateUser(auser)"
+                /> <label for="special-{{auser.name}}">Special</label>
+              </div></td>
+          </tr>
+          <tr>
+            <td><div>
+                <input type="checkbox" ng-model="auser.liker"
+                  id="liker-{{auser.name}}" ng-change="updateUser(auser)"
+                /> <label for="liker-{{auser.name}}">Liker</label>
+              </div></td>
+          </tr>
+          <tr>
+            <td><div>
+                <input type="checkbox" ng-model="auser.weirdo"
+                  id="weirdo-{{auser.name}}" ng-change="updateUser(auser)"
+                /> <label for="weirdo-{{auser.name}}">Weirdo</label>
+              </div></td>
+          </tr>
+          <tr>
+            <td><div>
+                <input type="checkbox" ng-model="auser.ifollow"
+                  id="ifollow-{{auser.name}}"
+                  ng-change="updateUser(auser)"
+                /> <label for="ifollow-{{auser.name}}">I follow</label>
+              </div></td>
+          </tr>
+          <tr>
+            <td colspan="2"><p class="oneline">{{auser.lastcheck
+                | date:'yyyy-MM-dd HH:mm'}}</p></td>
+          </tr>
+        </table>
+      </div>
+    </main>
+    <nav class="HolyGrail-nav">
+      <button ng-click="loadUsers('followsme,notweird')">My
+        followers</button>
+      <button ng-click="loadUsers('special')">Specials</button>
+      <button ng-click="loadUsers('weird')">Weirdos</button>
+      <button ng-click="loadUsers('followsme,notweird,notifollow')">To
+        follow back</button>
+      <button
+        ng-click="loadUsers('notspecial,notfollowsme,ifollow,notweird')"
+      >Should be following me</button>
+      <button ng-click="unfollowAsocials()">Unfollow asocials</button>
+      <button ng-click="loadUsers('likers,notweird')">Likers</button>
+      <button ng-click="likeLikers()">Like likers</button>
+      <button ng-click="refreshFollowers()">Refresh followers</button>
+    </nav>
+    <aside class="HolyGrail-ads">
+      <div ng-repeat="message in messages">{{ message.timestamp |
+        date:'HH:mm:ss.sss'}}: {{ message.text }}</div>
+    </aside>
+  </div>
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.5.8/angular.js"
+  ></script>
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.1/sockjs.js"
+  ></script>
   <script type="text/javascript" src="/js/vertx-eventbus.js"></script>
   <script type="text/javascript" src="/js/app.js"></script>
 </body>

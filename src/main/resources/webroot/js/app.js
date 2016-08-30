@@ -1,9 +1,4 @@
-var myTumble = angular.module('myTumble', [ 'ngRoute' ]).config([ '$routeProvider', function($routeProvider) {
-    $routeProvider.when('/', {
-        templateUrl : '/tpl/users.html',
-        controller : 'Users'
-    }).otherwise('/');
-} ]);
+var myTumble = angular.module('myTumble', []);
 
 myTumble.factory('MyBackend', [ '$http', function($http) {
     var MyBackend = {};
