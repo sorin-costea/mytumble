@@ -142,15 +142,7 @@ public class WebServer extends SyncVerticle {
 
 		try {
 			vertx.eventBus().send("mytumble.mongo.resetfollowers", null, resetted -> {
-				vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, options, loaded -> {
-					if (loaded.succeeded()) {
-						vertx.eventBus().send("mytumble.mongo.saveusers", loaded.result().body(), saved -> {
-							vertx.eventBus().send("mytumble.web.status", "Refreshed from Tumblr");
-						});
-					} else {
-						vertx.eventBus().send("mytumble.web.status", "Refresh failed: " + loaded.cause().getLocalizedMessage());
-					}
-				});
+				vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, options);
 			});
 			ctx.response().setStatusCode(200).end();
 		} catch (Exception ex) {

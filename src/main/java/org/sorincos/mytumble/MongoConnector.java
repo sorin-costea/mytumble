@@ -44,6 +44,7 @@ public class MongoConnector extends SyncVerticle {
 
 		EventBus eb = vertx.eventBus();
 		eb.<JsonArray>consumer("mytumble.mongo.saveusers").handler(this::saveUsers);
+		eb.<JsonObject>consumer("mytumble.mongo.saveuser").handler(this::saveUser);
 		eb.<JsonArray>consumer("mytumble.mongo.getusers").handler(this::getUsers);
 		eb.<JsonArray>consumer("mytumble.mongo.getuser").handler(this::getUser);
 		eb.<String>consumer("mytumble.mongo.resetfollowers").handler(this::resetFollowers);
@@ -55,15 +56,43 @@ public class MongoConnector extends SyncVerticle {
 			try {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 				JsonObject update = new JsonObject().put("$set", new JsonObject().put("followsme", false));
-				MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("users", new JsonObject(),
-				    update, new UpdateOptions().setMulti(true), h));
-				logger.info("Users upsert: " + res.getDocModified());
-				future.complete("Users upsert: " + res.getDocModified());
+				MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("users",
+						new JsonObject(), update, new UpdateOptions().setMulti(true), h));
+				logger.info("Users reset: " + res.getDocModified());
+				future.complete("Users reset: " + res.getDocModified());
 			} catch (Exception ex) {
 				ex.printStackTrace();
 				future.fail(ex.getLocalizedMessage());
 			}
 		}), result -> {
+			if (result.succeeded()) {
+				msg.reply(result.result());
+			} else {
+				msg.fail(1, result.cause().getLocalizedMessage());
+			}
+		});
+	}
+
+	private void saveUser(Message<JsonObject> msg) {
+		vertx.<JsonObject>executeBlocking(future -> {
+			try {
+				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
+				UpdateOptions options = new UpdateOptions().setUpsert(true);
+				JsonObject user = msg.body();
+				JsonObject upsert = new JsonObject().put("$set", (JsonObject) user);
+				client.updateCollectionWithOptions("users",
+						new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options,
+						h -> {
+							if (h.failed()) {
+								logger.info("Users upsert failed: " + h.cause().getLocalizedMessage());
+							}
+						});
+				future.complete();
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				future.fail(ex.getLocalizedMessage());
+			}
+		}, result -> {
 			if (result.succeeded()) {
 				msg.reply(result.result());
 			} else {
@@ -84,7 +113,8 @@ public class MongoConnector extends SyncVerticle {
 					JsonObject upsert = new JsonObject().put("$set", (JsonObject) user);
 					// await, to not kill Mongo's thread pool
 					MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("users",
-					    new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options, h));
+							new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert,
+							options, h));
 					logger.info("Users upsert: " + res.getDocModified());
 					total -= res.getDocModified();
 				}
