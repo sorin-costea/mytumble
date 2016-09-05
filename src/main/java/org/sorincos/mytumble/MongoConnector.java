@@ -84,7 +84,7 @@ public class MongoConnector extends SyncVerticle {
 						new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options,
 						h -> {
 							if (h.failed()) {
-								logger.info("Users upsert failed: " + h.cause().getLocalizedMessage());
+								logger.info("User upsert failed: " + h.cause().getLocalizedMessage());
 							}
 						});
 				future.complete();
@@ -120,10 +120,11 @@ public class MongoConnector extends SyncVerticle {
 				}
 				if (total > 0) {
 					future.fail("Some users failed to update: " + total + " of " + users.size());
+				} else {
+					future.complete();
 				}
-				future.complete();
 			} catch (Exception ex) {
-				ex.printStackTrace();
+				logger.error("Exception updating users: ", ex);
 				future.fail(ex.getLocalizedMessage());
 			}
 		}), result -> {
@@ -179,23 +180,24 @@ public class MongoConnector extends SyncVerticle {
 
 	private JsonObject createQueryFromFilters(JsonArray filters) {
 		JsonObject query = new JsonObject();
+		JsonObject notTrue = new JsonObject().put("$ne", true);
 		for (Object filter : filters) {
 			if ("special".compareToIgnoreCase((String) filter) == 0)
 				query.put("special", true);
 			if ("notspecial".compareToIgnoreCase((String) filter) == 0)
-				query.put("special", false);
+				query.put("special", notTrue);
 			if ("weird".compareToIgnoreCase((String) filter) == 0)
 				query.put("weirdo", true);
 			if ("notweird".compareToIgnoreCase((String) filter) == 0)
-				query.put("weirdo", false);
+				query.put("weirdo", notTrue);
 			if ("followsme".compareToIgnoreCase((String) filter) == 0)
 				query.put("followsme", true);
 			if ("notfollowsme".compareToIgnoreCase((String) filter) == 0)
-				query.put("followsme", false);
+				query.put("followsme", notTrue);
 			if ("ifollow".compareToIgnoreCase((String) filter) == 0)
 				query.put("ifollow", true);
 			if ("notifollow".compareToIgnoreCase((String) filter) == 0)
-				query.put("ifollow", false);
+				query.put("ifollow", notTrue);
 			if ("likers".compareToIgnoreCase((String) filter) == 0)
 				query.put("liker", true);
 		}
