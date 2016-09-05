@@ -77,11 +77,13 @@ public class TumblrConnector extends AbstractVerticle {
 
 	@Override
 	public void start() throws Exception {
-		JumblrClient client = new JumblrClient(key, secret);
-		client.setToken(oauthtoken, oauthpass);
-		EventBus eb = vertx.eventBus();
-		vertx.getOrCreateContext().put("jumblrclient", client);
+		if (null == vertx.getOrCreateContext().get("jumblrclient")) {
+			JumblrClient client = new JumblrClient(key, secret);
+			client.setToken(oauthtoken, oauthpass);
+			vertx.getOrCreateContext().put("jumblrclient", client);
+		}
 
+		EventBus eb = vertx.eventBus();
 		eb.<JsonArray>consumer("mytumble.tumblr.loadfollowers").handler(this::loadFollowers);
 		eb.<JsonArray>consumer("mytumble.tumblr.loadfollowerdetails").handler(this::loadFollowerDetails);
 		eb.<JsonArray>consumer("mytumble.tumblr.loadposts").handler(this::loadPosts);

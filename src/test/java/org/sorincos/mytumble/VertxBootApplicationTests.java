@@ -9,32 +9,22 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @SpringBootTest(classes = VertxBootApplication.class)
-@ConfigurationProperties(prefix = "connection")
+@ConfigurationProperties(prefix = "database")
 public class VertxBootApplicationTests {
 
-	private String key;
-	private String databaseName;
+	private String name;
 
 	@Test
 	public void contextLoads() {
-		Assert.assertNotNull(key);
-		Assert.assertNotNull(databaseName);
+		Assert.assertNotNull(name);
 	}
 
-	public String getKey() {
-		return key;
+	public String getName() {
+		return name;
 	}
 
-	public void setKey(String key) {
-		this.key = key;
-	}
-
-	public String getDatabaseName() {
-		return databaseName;
-	}
-
-	public void setDatabaseName(String databaseName) {
-		this.databaseName = databaseName;
+	public void setName(String name) {
+		this.name = name;
 	}
 
 }
