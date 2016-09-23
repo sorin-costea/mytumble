@@ -10,6 +10,7 @@
   <header class="heavy">Users list</header>
   <div class="HolyGrail-body">
     <main class="HolyGrail-content">
+    <section class="heavy">Total: {{users.length}}</section>
     <div ng-repeat="auser in users" class="tile">
       <table style="width: 150px">
         <tr>
@@ -21,7 +22,7 @@
         </tr>
         <tr>
           <td rowspan="4" width="48px"><img
-            ng-src="{{auser.avatarurl}}"
+            ng-src="{{auser.avatarurl}}" src="img/smiley.png"
           /></td>
           <td><div>
               <input type="checkbox" ng-model="auser.special"
@@ -62,6 +63,8 @@
     <nav class="HolyGrail-nav">
       <button ng-click="loadUsers('followsme,notweird')">My
         followers</button>
+      <button ng-click="loadUsers('ifollow')">I
+        follow</button>
       <button ng-click="loadUsers('special')">Specials</button>
       <button ng-click="loadUsers('weird')">Weirdos</button>
       <button ng-click="loadUsers('followsme,notweird,notifollow')">To
@@ -72,7 +75,7 @@
       <button ng-click="unfollowAsocials()">Unfollow asocials</button>
       <button ng-click="loadUsers('likers,notweird')">Likers</button>
       <button ng-click="likeLikers()">Like likers</button>
-      <button ng-click="refreshFollowers()">Refresh followers</button>
+      <button ng-click="refreshUsers()">Refresh users</button>
     </nav>
     <aside class="HolyGrail-ads">
       <div ng-repeat="message in messages">{{ message.timestamp |

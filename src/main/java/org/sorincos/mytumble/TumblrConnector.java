@@ -84,8 +84,8 @@ public class TumblrConnector extends AbstractVerticle {
 		}
 
 		EventBus eb = vertx.eventBus();
-		eb.<JsonArray>consumer("mytumble.tumblr.loadfollowers").handler(this::loadFollowers);
-		eb.<JsonArray>consumer("mytumble.tumblr.loadfollowerdetails").handler(this::loadFollowerDetails);
+		eb.<JsonArray>consumer("mytumble.tumblr.loadusers").handler(this::loadUsers);
+		eb.<JsonArray>consumer("mytumble.tumblr.loaduserdetails").handler(this::loadUserDetails);
 		eb.<JsonArray>consumer("mytumble.tumblr.loadposts").handler(this::loadPosts);
 		eb.<String>consumer("mytumble.tumblr.likelatest").handler(this::likeLatest);
 		eb.<String>consumer("mytumble.tumblr.followblog").handler(this::followBlog);
@@ -172,6 +172,7 @@ public class TumblrConnector extends AbstractVerticle {
 		});
 	}
 
+	@Deprecated
 	private void loadPosts(Message<JsonArray> msg) {
 		vertx.<JsonArray>executeBlocking(future -> {
 			logger.info("Posts for " + blogname);
@@ -199,18 +200,14 @@ public class TumblrConnector extends AbstractVerticle {
 				JsonArray jsonPosts = new JsonArray();
 				int count = 0;
 				for (Post post : posts) {
-					count++;
 					JsonObject jsonPost = new JsonObject();
 					jsonPost.put("timestamp", post.getTimestamp());
 					jsonPost.put("postid", post.getId());
 					if (null != post.getRebloggedFromName()) {
 						continue; // don't care about what I reblogged
 					}
-					logger.info("Post " + count + "/" + posts.size()); // only
-																		// own
-																		// posts
-																		// are
-																		// logged
+					count++;
+					logger.info("Post " + count);
 					JsonArray jsonNotes = new JsonArray();
 					for (Note note : post.getNotes()) {
 						logger.info("- " + post.getNoteCount() + "/" + note.getBlogName());
@@ -237,26 +234,16 @@ public class TumblrConnector extends AbstractVerticle {
 		});
 	}
 
-	private void loadFollowerDetails(Message<JsonArray> msg) {
+	private void loadUserDetails(Message<JsonArray> msg) {
 		vertx.<JsonArray>executeBlocking(future -> {
 			try {
 				JsonArray jsonFollowers = msg.body();
+				if (jsonFollowers.isEmpty()) {
+					future.fail("No details to load");
+				}
 				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
 				int count = 0;
-				for (Object follower : jsonFollowers) { // TODO timer for delays
-					JsonObject jsonFollower = (JsonObject) follower;
-					logger.info("Info about " + ++count + "/" + jsonFollowers.size() + " "
-							+ jsonFollower.getString("name"));
-					try {
-						String avatar = client.blogAvatar(jsonFollower.getString("name") + ".tumblr.com");
-						jsonFollower.put("avatarurl", avatar);
-					} catch (JumblrException e) {
-						// TODO move the default in html/js
-						jsonFollower.put("avatarurl", "img/smiley.png");
-						logger.warn(e.getLocalizedMessage());
-					}
-					vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
-				}
+				loopUsers(jsonFollowers, client, count);
 				future.complete(jsonFollowers);
 			} catch (Exception ex) {
 				ex.printStackTrace();
@@ -264,16 +251,38 @@ public class TumblrConnector extends AbstractVerticle {
 			}
 		}, result -> {
 			if (result.succeeded()) {
-				vertx.eventBus().send("mytumble.web.status", "Refreshed details from Tumblr");
-				msg.reply("Refreshed from Tumblr");
+				vertx.eventBus().send("mytumble.web.status", "Fetching details from Tumblr");
+				msg.reply(result.result());
 			} else {
-				vertx.eventBus().send("mytumble.web.status", "Refresh failed: " + result.cause().getLocalizedMessage());
+				vertx.eventBus().send("mytumble.web.status",
+				        "Refresh details failed: " + result.cause().getLocalizedMessage());
 				msg.fail(1, result.cause().getLocalizedMessage());
 			}
 		});
 	}
 
-	private void loadFollowers(Message<JsonArray> msg) {
+	private int loopUsers(JsonArray jsonFollowers, JumblrClient client, final int count) {
+		if (jsonFollowers.size() > count) {
+			vertx.setTimer(100, t -> {
+				JsonObject jsonFollower = (JsonObject) jsonFollowers.getJsonObject(count);
+				final int nrCrt = count + 1;
+				logger.info("Info about " + nrCrt + "/" + jsonFollowers.size() + " " + jsonFollower.getString("name"));
+				try {
+					String avatar = client.blogAvatar(jsonFollower.getString("name") + ".tumblr.com");
+					jsonFollower.put("avatarurl", avatar);
+				} catch (JumblrException e) {
+					logger.warn("Getting avatar for" + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
+				}
+				vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
+				loopUsers(jsonFollowers, client, count + 1);
+			});
+		} else {
+			vertx.eventBus().send("mytumble.web.status", "Finished details from Tumblr");
+		}
+		return count;
+	}
+
+	private void loadUsers(Message<JsonArray> msg) {
 		vertx.<JsonArray>executeBlocking(future -> {
 			Blog myBlog = null;
 			try {
@@ -288,26 +297,45 @@ public class TumblrConnector extends AbstractVerticle {
 				if (null == myBlog) {
 					future.fail("Error: Blog name not found - " + blogname);
 				}
+				JsonArray jsonUsers = new JsonArray();
+				Map<String, String> options = new HashMap<String, String>();
+				int offset = 0, fetched = 0;
+				do {
+					options.put("offset", Integer.toString(offset));
+					List<Blog> blogs = client.userFollowing(options);
+					fetched = blogs.size();
+					offset += fetched;
+					for (Blog blog : blogs) {
+						JsonObject jsonIfollow = new JsonObject();
+						jsonIfollow.put("name", blog.getName());
+						jsonIfollow.put("lastcheck", now);
+						jsonIfollow.put("ifollow", true);
+						jsonUsers.add(jsonIfollow);
+					}
+				} while (fetched > 0);
+				logger.info("I follow: " + jsonUsers.size());
+
 				int numFollowers = myBlog.getFollowersCount();
 				logger.info("Followers: " + numFollowers);
 
-				Map<String, String> options = new HashMap<String, String>();
-				options.put("offset", Integer.toString(0));
-				List<User> followers = myBlog.followers(options);
-				for (Integer offset = 20; offset < numFollowers; offset += 20) {
-					logger.info(offset + "...");
+				offset = 0;
+				do {
 					options.put("offset", Integer.toString(offset));
-					followers.addAll(myBlog.followers(options));
-				}
-				JsonArray jsonFollowers = new JsonArray();
-				for (User follower : followers) {
-					JsonObject jsonFollower = new JsonObject();
-					jsonFollower.put("name", follower.getName());
-					jsonFollower.put("lastcheck", now);
-					jsonFollower.put("followsme", true);
-					jsonFollowers.add(jsonFollower);
-				}
-				future.complete(jsonFollowers);
+					List<User> followers = myBlog.followers(options);
+					fetched = followers.size();
+					offset += fetched;
+					for (User follower : followers) {
+						JsonObject jsonFollower = new JsonObject();
+						jsonFollower.put("name", follower.getName());
+						jsonFollower.put("lastcheck", now);
+						jsonFollower.put("followsme", true);
+						jsonUsers.add(jsonFollower);
+					}
+
+				} while (fetched > 0);
+
+				logger.info("Total users: " + jsonUsers.size());
+				future.complete(jsonUsers);
 			} catch (Exception ex) {
 				ex.printStackTrace();
 				future.fail(ex.getLocalizedMessage());
@@ -316,6 +344,9 @@ public class TumblrConnector extends AbstractVerticle {
 			if (result.succeeded()) {
 				vertx.eventBus().send("mytumble.mongo.saveusers", result.result(), saved -> {
 					vertx.eventBus().send("mytumble.web.status", "Refreshed from Tumblr");
+					vertx.eventBus().send("mytumble.mongo.getusers", "", loaded -> {
+						vertx.eventBus().send("mytumble.tumblr.loaduserdetails", loaded.result().body());
+					});
 				});
 				msg.reply("Refreshed from Tumblr");
 			} else {

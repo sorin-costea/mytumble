@@ -4,14 +4,12 @@ import static io.vertx.ext.sync.Sync.awaitResult;
 import static io.vertx.ext.sync.Sync.fiberHandler;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 
 import co.paralleluniverse.fibers.Suspendable;
@@ -35,23 +33,23 @@ public class WebServer extends SyncVerticle {
 
 	static final Logger logger = LoggerFactory.getLogger(WebServer.class);
 	private final DeliveryOptions options = new DeliveryOptions().setSendTimeout(5 * 60 * 1000); // 5
-																									// minutes,
-																									// just
-																									// because
+	                                                                                             // minutes,
+	                                                                                             // just
+	                                                                                             // because
 
 	@Override
 	public void start() throws Exception {
 
 		Router router = Router.router(vertx);
 		BridgeOptions sockJsOpts = new BridgeOptions()
-				.addOutboundPermitted(new PermittedOptions().setAddress("mytumble.web.status"));
+		        .addOutboundPermitted(new PermittedOptions().setAddress("mytumble.web.status"));
 		SockJSHandler sockBridgeHandler = SockJSHandler.create(vertx).bridge(sockJsOpts);
 		router.route("/eb/*").handler(sockBridgeHandler);
 
 		router.route().handler(BodyHandler.create());
 
 		// trigger actions
-		router.put("/api/status/refreshfollowers").handler(fiberHandler(this::refreshFollowers));
+		router.put("/api/status/refreshusers").handler(fiberHandler(this::refreshUsers));
 		router.put("/api/status/likelikers").handler(fiberHandler(this::likeLikers));
 		router.put("/api/status/unfollowasocials").handler(fiberHandler(this::unfollowAsocials));
 
@@ -71,33 +69,27 @@ public class WebServer extends SyncVerticle {
 		logger.info("Unfollowing those who don't follow back");
 
 		try {
-			vertx.eventBus().send("mytumble.mongo.getusers", createFilter("notspecial,notfollowsme,ifollow,notweird"),
-					options, fiberHandler(result -> {
-						ArrayList<Object> notFollowers = Lists.newArrayList((JsonArray) result.result().body());
-						JsonArray notAFollowers = new JsonArray();
-						for (Object notFollower : notFollowers) {
-							@SuppressWarnings("unused")
-							Message<String> res = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.unfollowblog",
-									((JsonObject) notFollower).getString("name"), h)); // unfollow
-																						// them
-
-							((JsonObject) notFollower).put("ifollow", false); // and
-																				// mark
-																				// for
-																				// db
-																				// update
-							notAFollowers.add((JsonObject) notFollower);
-						}
-						vertx.eventBus().send("mytumble.mongo.saveusers", notAFollowers, save -> {
-							vertx.eventBus().send("mytumble.web.status", "Unfollowed asocials");
-						});
-					}));
+			vertx.eventBus().send("mytumble.mongo.getusers", "notspecial,notfollowsme,ifollow,notweird", options,
+			        fiberHandler(result -> {
+				        ArrayList<Object> notFollowers = Lists.newArrayList((JsonArray) result.result().body());
+				        JsonArray notAFollowers = new JsonArray();
+				        for (Object notFollower : notFollowers) {
+					        @SuppressWarnings("unused")
+					        Message<String> res = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.unfollowblog",
+					                ((JsonObject) notFollower).getString("name"), h)); // TODO async maybe?
+					        ((JsonObject) notFollower).put("ifollow", false);
+					        notAFollowers.add((JsonObject) notFollower);
+				        }
+				        vertx.eventBus().send("mytumble.mongo.saveusers", notAFollowers, save -> {
+					        vertx.eventBus().send("mytumble.web.status", "Unfollowed asocials");
+				        });
+			        }));
 			ctx.response().setStatusCode(200).end();
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			if (ctx.response().ended()) {
 				vertx.eventBus().send("mytumble.web.status",
-						"Unfollowing asocials failed: " + ex.getLocalizedMessage());
+				        "Unfollowing asocials failed: " + ex.getLocalizedMessage());
 			} else {
 				ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
 			}
@@ -109,13 +101,13 @@ public class WebServer extends SyncVerticle {
 		logger.info("Liking my likers");
 
 		try {
-			vertx.eventBus().send("mytumble.mongo.getusers", createFilter("likers"), options, fiberHandler(result -> {
+			vertx.eventBus().send("mytumble.mongo.getusers", "likers", options, fiberHandler(result -> {
 				ArrayList<Object> likers = Lists.newArrayList((JsonArray) result.result().body());
 				for (Object liker : likers) {
 					@SuppressWarnings("unused")
 					Message<String> res = awaitResult( // serial for safety
-							h -> vertx.eventBus().send("mytumble.tumblr.likelatest",
-									((JsonObject) liker).getString("name"), h));
+					        h -> vertx.eventBus().send("mytumble.tumblr.likelatest",
+					                ((JsonObject) liker).getString("name"), h));
 				}
 				vertx.eventBus().send("mytumble.web.status", "Liked latest posts");
 			}));
@@ -134,7 +126,7 @@ public class WebServer extends SyncVerticle {
 		String filter = ctx.request().getParam("filter");
 		logger.info("Get " + ((filter.length() == 0) ? "" : filter) + " users");
 
-		vertx.eventBus().send("mytumble.mongo.getusers", createFilter(filter), options, result -> {
+		vertx.eventBus().send("mytumble.mongo.getusers", filter, options, result -> {
 			if (result.failed()) {
 				ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
 				return;
@@ -146,12 +138,12 @@ public class WebServer extends SyncVerticle {
 	}
 
 	@Suspendable
-	private void refreshFollowers(RoutingContext ctx) {
+	private void refreshUsers(RoutingContext ctx) {
 		logger.info("Refresh followers");
 
 		try {
-			vertx.eventBus().send("mytumble.mongo.resetfollowers", null, resetted -> {
-				vertx.eventBus().send("mytumble.tumblr.loadfollowers", null, options);
+			vertx.eventBus().send("mytumble.mongo.resetusers", null, resetted -> {
+				vertx.eventBus().send("mytumble.tumblr.loadusers", null, options);
 			});
 			ctx.response().setStatusCode(200).end();
 		} catch (Exception ex) {
@@ -172,28 +164,31 @@ public class WebServer extends SyncVerticle {
 			return;
 		}
 		logger.info("Updating " + toUpdate);
-
 		try {
-			vertx.eventBus().send("mytumble.mongo.getuser", new JsonArray().add(toUpdate), user -> {
-				if (((JsonArray) user.result().body()).isEmpty()) {
+			vertx.eventBus().send("mytumble.mongo.getuser", new JsonArray().add(toUpdate), resultGet -> {
+				if (((JsonArray) resultGet.result().body()).isEmpty()) {
 					vertx.eventBus().send("mytumble.web.status", "Updating failed: " + toUpdate + " not found");
 					return;
 				}
-				Boolean ifollow = ((JsonArray) user.result().body()).getJsonObject(0).getBoolean("ifollow");
-				if (null == ifollow || (!ifollow && jsonUsers.getJsonObject(0).getBoolean("ifollow"))) {
+				JsonArray userFetched = (JsonArray) resultGet.result().body();
+				Boolean iFollow = userFetched.getJsonObject(0).getBoolean("ifollow");
+				JsonObject userNew = jsonUsers.getJsonObject(0);
+				Boolean shouldFollow = userNew.getBoolean("ifollow");
+				if ((iFollow == null || !iFollow) && (shouldFollow != null && shouldFollow)) { // wasnt following
 					vertx.eventBus().send("mytumble.tumblr.followblog", toUpdate, h -> {
 						if (h.failed()) {
 							logger.info("Failed when following " + toUpdate + ": " + h.cause().getLocalizedMessage());
 							vertx.eventBus().send("mytumble.web.status",
-									"Failed when following " + toUpdate + ": " + h.cause().getLocalizedMessage());
+							        "Failed when following " + toUpdate + ": " + h.cause().getLocalizedMessage());
 						}
 					});
-				} else if (ifollow && !jsonUsers.getJsonObject(0).getBoolean("ifollow")) {
+				}
+				if ((iFollow != null && iFollow) && (shouldFollow != null && !shouldFollow)) { // previously following
 					vertx.eventBus().send("mytumble.tumblr.unfollowblog", toUpdate, h -> {
 						if (h.failed()) {
 							logger.info("Failed when unfollowing " + toUpdate + ": " + h.cause().getLocalizedMessage());
 							vertx.eventBus().send("mytumble.web.status",
-									"Failed when unfollowing " + toUpdate + ": " + h.cause().getLocalizedMessage());
+							        "Failed when unfollowing " + toUpdate + ": " + h.cause().getLocalizedMessage());
 						}
 					});
 				}
@@ -201,7 +196,7 @@ public class WebServer extends SyncVerticle {
 					if (h.failed()) {
 						logger.info("Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
 						vertx.eventBus().send("mytumble.web.status",
-								"Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
+						        "Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
 					} else {
 						vertx.eventBus().send("mytumble.web.status", "Updated user " + toUpdate);
 					}
@@ -216,14 +211,5 @@ public class WebServer extends SyncVerticle {
 				ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
 			}
 		}
-	}
-
-	private JsonArray createFilter(String parameters) {
-		List<String> filters = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(parameters);
-		JsonArray params = new JsonArray();
-		for (String filter : filters) {
-			params.add(filter);
-		}
-		return params;
 	}
 }

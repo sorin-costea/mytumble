@@ -4,12 +4,14 @@ import static io.vertx.ext.sync.Sync.awaitResult;
 import static io.vertx.ext.sync.Sync.fiberHandler;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 
 import co.paralleluniverse.fibers.Suspendable;
@@ -45,7 +47,7 @@ public class MongoConnector extends SyncVerticle {
 		EventBus eb = vertx.eventBus();
 		eb.<JsonArray>consumer("mytumble.mongo.saveusers").handler(this::saveUsers);
 		eb.<JsonObject>consumer("mytumble.mongo.saveuser").handler(this::saveUser);
-		eb.<JsonArray>consumer("mytumble.mongo.getusers").handler(this::getUsers);
+		eb.<String>consumer("mytumble.mongo.getusers").handler(this::getUsers);
 		eb.<JsonArray>consumer("mytumble.mongo.getuser").handler(this::getUser);
 		eb.<String>consumer("mytumble.mongo.resetfollowers").handler(this::resetFollowers);
 	}
@@ -57,7 +59,7 @@ public class MongoConnector extends SyncVerticle {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 				JsonObject update = new JsonObject().put("$set", new JsonObject().put("followsme", false));
 				MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("users",
-						new JsonObject(), update, new UpdateOptions().setMulti(true), h));
+				        new JsonObject(), update, new UpdateOptions().setMulti(true), h));
 				logger.info("Users reset: " + res.getDocModified());
 				future.complete("Users reset: " + res.getDocModified());
 			} catch (Exception ex) {
@@ -81,12 +83,12 @@ public class MongoConnector extends SyncVerticle {
 				JsonObject user = msg.body();
 				JsonObject upsert = new JsonObject().put("$set", (JsonObject) user);
 				client.updateCollectionWithOptions("users",
-						new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options,
-						h -> {
-							if (h.failed()) {
-								logger.info("User upsert failed: " + h.cause().getLocalizedMessage());
-							}
-						});
+				        new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options,
+				        h -> {
+					        if (h.failed()) {
+						        logger.info("User upsert failed: " + h.cause().getLocalizedMessage());
+					        }
+				        });
 				future.complete();
 			} catch (Exception ex) {
 				ex.printStackTrace();
@@ -113,9 +115,8 @@ public class MongoConnector extends SyncVerticle {
 					JsonObject upsert = new JsonObject().put("$set", (JsonObject) user);
 					// await, to not kill Mongo's thread pool
 					MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("users",
-							new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert,
-							options, h));
-					logger.info("Users upsert: " + res.getDocModified());
+					        new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert,
+					        options, h));
 					total -= res.getDocModified();
 				}
 				if (total > 0) {
@@ -136,7 +137,7 @@ public class MongoConnector extends SyncVerticle {
 		});
 	}
 
-	private void getUsers(Message<JsonArray> msg) {
+	private void getUsers(Message<String> msg) {
 		JsonObject query = createQueryFromFilters(msg.body());
 		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
@@ -178,7 +179,8 @@ public class MongoConnector extends SyncVerticle {
 		});
 	}
 
-	private JsonObject createQueryFromFilters(JsonArray filters) {
+	private JsonObject createQueryFromFilters(String filterString) {
+		List<String> filters = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(filterString);
 		JsonObject query = new JsonObject();
 		JsonObject notTrue = new JsonObject().put("$ne", true);
 		for (Object filter : filters) {
