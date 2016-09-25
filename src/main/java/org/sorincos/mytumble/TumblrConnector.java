@@ -307,6 +307,7 @@ public class TumblrConnector extends AbstractVerticle {
 					offset += fetched;
 					for (Blog blog : blogs) {
 						JsonObject jsonIfollow = new JsonObject();
+						jsonIfollow.put("_id", blog.getName());
 						jsonIfollow.put("name", blog.getName());
 						jsonIfollow.put("lastcheck", now);
 						jsonIfollow.put("ifollow", true);
@@ -326,6 +327,7 @@ public class TumblrConnector extends AbstractVerticle {
 					offset += fetched;
 					for (User follower : followers) {
 						JsonObject jsonFollower = new JsonObject();
+						jsonFollower.put("_id", follower.getName());
 						jsonFollower.put("name", follower.getName());
 						jsonFollower.put("lastcheck", now);
 						jsonFollower.put("followsme", true);
@@ -333,8 +335,6 @@ public class TumblrConnector extends AbstractVerticle {
 					}
 
 				} while (fetched > 0);
-
-				logger.info("Total users: " + jsonUsers.size());
 				future.complete(jsonUsers);
 			} catch (Exception ex) {
 				ex.printStackTrace();

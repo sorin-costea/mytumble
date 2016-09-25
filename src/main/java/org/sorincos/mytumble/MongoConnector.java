@@ -49,15 +49,16 @@ public class MongoConnector extends SyncVerticle {
 		eb.<JsonObject>consumer("mytumble.mongo.saveuser").handler(this::saveUser);
 		eb.<String>consumer("mytumble.mongo.getusers").handler(this::getUsers);
 		eb.<JsonArray>consumer("mytumble.mongo.getuser").handler(this::getUser);
-		eb.<String>consumer("mytumble.mongo.resetfollowers").handler(this::resetFollowers);
+		eb.<String>consumer("mytumble.mongo.resetusers").handler(this::resetUsers);
 	}
 
 	@Suspendable
-	private void resetFollowers(Message<String> msg) {
+	private void resetUsers(Message<String> msg) {
 		vertx.<String>executeBlocking(fiberHandler(future -> {
 			try {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-				JsonObject update = new JsonObject().put("$set", new JsonObject().put("followsme", false));
+				JsonObject update = new JsonObject().put("$set",
+				        new JsonObject().put("followsme", false).put("ifollow", false));
 				MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("users",
 				        new JsonObject(), update, new UpdateOptions().setMulti(true), h));
 				logger.info("Users reset: " + res.getDocModified());
@@ -79,16 +80,12 @@ public class MongoConnector extends SyncVerticle {
 		vertx.<JsonObject>executeBlocking(future -> {
 			try {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-				UpdateOptions options = new UpdateOptions().setUpsert(true);
 				JsonObject user = msg.body();
-				JsonObject upsert = new JsonObject().put("$set", (JsonObject) user);
-				client.updateCollectionWithOptions("users",
-				        new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert, options,
-				        h -> {
-					        if (h.failed()) {
-						        logger.info("User upsert failed: " + h.cause().getLocalizedMessage());
-					        }
-				        });
+				client.save("users", user, h -> {
+					if (h.failed()) {
+						logger.info("User upsert failed: " + h.cause().getLocalizedMessage());
+					}
+				});
 				future.complete();
 			} catch (Exception ex) {
 				ex.printStackTrace();
@@ -108,22 +105,17 @@ public class MongoConnector extends SyncVerticle {
 		vertx.<JsonArray>executeBlocking(fiberHandler(future -> {
 			try {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-				UpdateOptions options = new UpdateOptions().setUpsert(true);
 				ArrayList<Object> users = Lists.newArrayList(msg.body());
 				int total = users.size();
+				logger.info("Upserting users: " + total);
 				for (Object user : users) {
-					JsonObject upsert = new JsonObject().put("$set", (JsonObject) user);
 					// await, to not kill Mongo's thread pool
-					MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("users",
-					        new JsonObject().put("name", upsert.getJsonObject("$set").getString("name")), upsert,
-					        options, h));
-					total -= res.getDocModified();
+					String res = awaitResult(h -> client.save("users", (JsonObject) user, h));
+					if (res != null) {
+						logger.error(res);
+					}
 				}
-				if (total > 0) {
-					future.fail("Some users failed to update: " + total + " of " + users.size());
-				} else {
-					future.complete();
-				}
+				future.complete();
 			} catch (Exception ex) {
 				logger.error("Exception updating users: ", ex);
 				future.fail(ex.getLocalizedMessage());
