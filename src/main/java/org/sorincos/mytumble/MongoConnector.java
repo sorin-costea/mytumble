@@ -19,6 +19,7 @@ import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.mongo.FindOptions;
 import io.vertx.ext.mongo.MongoClient;
 import io.vertx.ext.mongo.MongoClientUpdateResult;
 import io.vertx.ext.mongo.UpdateOptions;
@@ -107,14 +108,27 @@ public class MongoConnector extends SyncVerticle {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 				ArrayList<Object> users = Lists.newArrayList(msg.body());
 				int total = users.size();
-				logger.info("Upserting users: " + total);
+				logger.info("Saving users: " + total);
+				int followsme = 0;
+				int ifollow = 0;
 				for (Object user : users) {
+					if (((JsonObject) user).getBoolean("ifollow") != null && ((JsonObject) user).getBoolean("ifollow"))
+						ifollow++;
+					if (((JsonObject) user).getBoolean("followsme") != null
+					        && ((JsonObject) user).getBoolean("followsme"))
+						followsme++;
 					// await, to not kill Mongo's thread pool
 					String res = awaitResult(h -> client.save("users", (JsonObject) user, h));
-					if (res != null) {
+					if (res != null) { // not sure what that means
 						logger.error(res);
 					}
+					List<JsonObject> found = awaitResult(h -> client.find("users", (JsonObject) user, h));
+					if (found.size() != 1) {
+						logger.error(found.size() + " for user " + ((JsonObject) user).getString("name"));
+					}
 				}
+				logger.info("ifollow " + ifollow);
+				logger.info("followsme " + followsme);
 				future.complete();
 			} catch (Exception ex) {
 				logger.error("Exception updating users: ", ex);
@@ -133,7 +147,8 @@ public class MongoConnector extends SyncVerticle {
 		JsonObject query = createQueryFromFilters(msg.body());
 		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-			client.find("users", query, res -> {
+			FindOptions options = new FindOptions().setSort(new JsonObject().put("name", 1));
+			client.findWithOptions("users", query, options, res -> {
 				if (res.failed()) {
 					future.fail(res.cause().getLocalizedMessage());
 				}

@@ -74,9 +74,8 @@ public class WebServer extends SyncVerticle {
 				        ArrayList<Object> notFollowers = Lists.newArrayList((JsonArray) result.result().body());
 				        JsonArray notAFollowers = new JsonArray();
 				        for (Object notFollower : notFollowers) {
-					        @SuppressWarnings("unused")
-					        Message<String> res = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.unfollowblog",
-					                ((JsonObject) notFollower).getString("name"), h)); // TODO async maybe?
+					        awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.unfollowblog",
+					                ((JsonObject) notFollower).getString("name")));
 					        ((JsonObject) notFollower).put("ifollow", false);
 					        notAFollowers.add((JsonObject) notFollower);
 				        }
@@ -101,13 +100,12 @@ public class WebServer extends SyncVerticle {
 		logger.info("Liking my likers");
 
 		try {
-			vertx.eventBus().send("mytumble.mongo.getusers", "likers", options, fiberHandler(result -> {
+			vertx.eventBus().send("mytumble.mongo.getusers", "followsme,notweird", options, fiberHandler(result -> {
 				ArrayList<Object> likers = Lists.newArrayList((JsonArray) result.result().body());
 				for (Object liker : likers) {
-					@SuppressWarnings("unused")
-					Message<String> res = awaitResult( // serial for safety
-					        h -> vertx.eventBus().send("mytumble.tumblr.likelatest",
-					                ((JsonObject) liker).getString("name"), h));
+					Message<String> res = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.likelatest",
+					        ((JsonObject) liker).getString("name"), h));
+					logger.info(res.body());
 				}
 				vertx.eventBus().send("mytumble.web.status", "Liked latest posts");
 			}));
