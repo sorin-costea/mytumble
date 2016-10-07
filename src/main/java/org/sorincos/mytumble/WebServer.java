@@ -50,7 +50,7 @@ public class WebServer extends SyncVerticle {
 
 		// trigger actions
 		router.put("/api/status/refreshusers").handler(fiberHandler(this::refreshUsers));
-		router.put("/api/status/likelikers").handler(fiberHandler(this::likeLikers));
+		router.put("/api/status/likeusers").handler(fiberHandler(this::likeUsers));
 		router.put("/api/status/unfollowasocials").handler(fiberHandler(this::unfollowAsocials));
 
 		// modifying stuff
@@ -96,11 +96,11 @@ public class WebServer extends SyncVerticle {
 	}
 
 	@Suspendable
-	private void likeLikers(RoutingContext ctx) {
+	private void likeUsers(RoutingContext ctx) {
 		logger.info("Liking my likers");
-
+		String filter = ctx.request().getParam("filter");
 		try {
-			vertx.eventBus().send("mytumble.mongo.getusers", "followsme,notweird", options, fiberHandler(result -> {
+			vertx.eventBus().send("mytumble.mongo.getusers", filter, options, fiberHandler(result -> {
 				ArrayList<Object> likers = Lists.newArrayList((JsonArray) result.result().body());
 				for (Object liker : likers) {
 					try {

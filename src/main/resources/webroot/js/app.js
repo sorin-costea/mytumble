@@ -5,8 +5,8 @@ myTumble.factory('MyBackend', [ '$http', function($http) {
     MyBackend.getUsers = function(filter) {
         return $http.get('/api/users' + filter);
     };
-    MyBackend.likeLikers = function() {
-        return $http.put('/api/status/likelikers');
+    MyBackend.likeUsers = function(filter) {
+        return $http.put('/api/status/likeusers' + filter);
     };
     MyBackend.unfollowAsocials = function() {
         return $http.put('/api/status/unfollowasocials');
@@ -57,11 +57,11 @@ myTumble.controller('Users', [
                 });
             };
 
-            $scope.likeLikers = function() {
-                $scope.addLog('Liking back the likers');
-                MyBackend.likeLikers().then(function(response) {
+            $scope.likeUsers = function(filter) {
+                $scope.addLog('Liking users (' + filter + ')');
+                MyBackend.likeUsers('?filter=' + filter).then(function(response) {
                 }, function(error) {
-                    $scope.addLog('Failed to like users: ' + error.message);
+                    $scope.addLog('Failed to like users (' + filter + '): ' + error.message);
                 });
             };
 
