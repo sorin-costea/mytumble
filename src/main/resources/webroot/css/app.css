@@ -2,6 +2,26 @@
 	url(https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css)
 	;
 
+a:link {
+	color: #404040;
+	text-decoration: none;
+}
+
+a:visited {
+	color: #404040;
+	text-decoration: none;
+}
+
+a:hover {
+	color: #404040;
+	text-decoration: underline;
+}
+
+a:active {
+	color: #404040;
+	text-decoration: underline;
+}
+
 input[type=checkbox] {
 	display: none;
 }
