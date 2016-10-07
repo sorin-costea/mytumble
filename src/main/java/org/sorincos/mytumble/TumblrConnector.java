@@ -95,7 +95,6 @@ public class TumblrConnector extends AbstractVerticle {
 	private void likeLatest(Message<String> msg) {
 		vertx.<String>executeBlocking(future -> {
 			String toLike = msg.body();
-			logger.info("Liking latest post of " + toLike);
 			try {
 				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
 				if (null == client) {
@@ -106,7 +105,7 @@ public class TumblrConnector extends AbstractVerticle {
 				for (Post post : posts) {
 					if (null == post.getSourceUrl()) { // no use to like reblogs
 						client.like(post.getId(), post.getReblogKey());
-						logger.info("Liked " + post.getId());
+						logger.info("Liked " + toLike + ":" + post.getId());
 						break; // like only latest own post
 					}
 				}

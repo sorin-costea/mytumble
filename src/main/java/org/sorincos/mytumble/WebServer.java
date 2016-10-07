@@ -103,9 +103,13 @@ public class WebServer extends SyncVerticle {
 			vertx.eventBus().send("mytumble.mongo.getusers", "followsme,notweird", options, fiberHandler(result -> {
 				ArrayList<Object> likers = Lists.newArrayList((JsonArray) result.result().body());
 				for (Object liker : likers) {
-					Message<String> res = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.likelatest",
-					        ((JsonObject) liker).getString("name"), h));
-					logger.info(res.body());
+					try {
+						@SuppressWarnings("unused")
+						Message<String> res = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.likelatest",
+						        ((JsonObject) liker).getString("name"), h));
+					} catch (Exception ex) {
+						logger.error(ex.getLocalizedMessage());
+					}
 				}
 				vertx.eventBus().send("mytumble.web.status", "Liked latest posts");
 			}));
