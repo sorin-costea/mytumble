@@ -66,9 +66,8 @@ public class MongoConnectorTests {
 
 	@After
 	public void tearDown() throws Exception {
-		if (mongoConnVerticle != null) {
+		if (mongoConnVerticle != null)
 			mongoConnVerticle.stop();
-		}
 	}
 
 	@Test

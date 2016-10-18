@@ -71,9 +71,8 @@ public class TumblrConnectorTests {
 
 	@After
 	public void tearDown() throws Exception {
-		if (tumblrConnVerticle != null) {
+		if (tumblrConnVerticle != null)
 			tumblrConnVerticle.stop();
-		}
 	}
 
 	@Test

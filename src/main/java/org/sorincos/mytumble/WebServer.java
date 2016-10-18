@@ -86,12 +86,11 @@ public class WebServer extends SyncVerticle {
 			ctx.response().setStatusCode(200).end();
 		} catch (Exception ex) {
 			ex.printStackTrace();
-			if (ctx.response().ended()) {
+			if (ctx.response().ended())
 				vertx.eventBus().send("mytumble.web.status",
 				        "Unfollowing asocials failed: " + ex.getLocalizedMessage());
-			} else {
+			else
 				ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
-			}
 		}
 	}
 
@@ -105,8 +104,8 @@ public class WebServer extends SyncVerticle {
 				for (Object liker : likers) {
 					try {
 						@SuppressWarnings("unused")
-						Message<String> res = awaitResult(h -> vertx.eventBus().send("mytumble.tumblr.likelatest",
-						        ((JsonObject) liker).getString("name"), h));
+						Message<JsonObject> res = awaitResult(
+						        h -> vertx.eventBus().send("mytumble.tumblr.likelatest", (JsonObject) liker, h));
 					} catch (Exception ex) {
 						logger.error(ex.getLocalizedMessage());
 					}
@@ -116,11 +115,10 @@ public class WebServer extends SyncVerticle {
 			ctx.response().setStatusCode(200).end();
 		} catch (Exception ex) {
 			ex.printStackTrace();
-			if (ctx.response().ended()) {
+			if (ctx.response().ended())
 				vertx.eventBus().send("mytumble.web.status", "Liking failed: " + ex.getLocalizedMessage());
-			} else {
+			else
 				ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
-			}
 		}
 	}
 
@@ -150,18 +148,17 @@ public class WebServer extends SyncVerticle {
 			ctx.response().setStatusCode(200).end();
 		} catch (Exception ex) {
 			ex.printStackTrace();
-			if (ctx.response().ended()) {
+			if (ctx.response().ended())
 				vertx.eventBus().send("mytumble.web.status", "Refresh failed: " + ex.getLocalizedMessage());
-			} else {
+			else
 				ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
-			}
 		}
 	}
 
 	private void updateUser(RoutingContext ctx) {
 		String toUpdate = ctx.request().getParam("name");
 		JsonArray jsonUsers = new JsonArray().add(ctx.getBodyAsJson());
-		if (null == toUpdate || jsonUsers.isEmpty()) {
+		if (toUpdate == null || jsonUsers.isEmpty()) {
 			ctx.response().setStatusCode(400).setStatusMessage("Nothing to update.").end();
 			return;
 		}

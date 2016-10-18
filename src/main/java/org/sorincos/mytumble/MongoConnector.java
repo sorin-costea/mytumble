@@ -69,11 +69,10 @@ public class MongoConnector extends SyncVerticle {
 				future.fail(ex.getLocalizedMessage());
 			}
 		}), result -> {
-			if (result.succeeded()) {
+			if (result.succeeded())
 				msg.reply(result.result());
-			} else {
+			else
 				msg.fail(1, result.cause().getLocalizedMessage());
-			}
 		});
 	}
 
@@ -83,9 +82,8 @@ public class MongoConnector extends SyncVerticle {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 				JsonObject user = msg.body();
 				client.save("users", user, h -> {
-					if (h.failed()) {
+					if (h.failed())
 						logger.info("User upsert failed: " + h.cause().getLocalizedMessage());
-					}
 				});
 				future.complete();
 			} catch (Exception ex) {
@@ -93,11 +91,10 @@ public class MongoConnector extends SyncVerticle {
 				future.fail(ex.getLocalizedMessage());
 			}
 		}, result -> {
-			if (result.succeeded()) {
+			if (result.succeeded())
 				msg.reply(result.result());
-			} else {
+			else
 				msg.fail(1, result.cause().getLocalizedMessage());
-			}
 		});
 	}
 
@@ -119,13 +116,11 @@ public class MongoConnector extends SyncVerticle {
 						followsme++;
 					// await, to not kill Mongo's thread pool
 					String res = awaitResult(h -> client.save("users", (JsonObject) user, h));
-					if (res != null) { // not sure what that means
+					if (res != null) // not sure what that means
 						logger.error(res);
-					}
 					List<JsonObject> found = awaitResult(h -> client.find("users", (JsonObject) user, h));
-					if (found.size() != 1) {
+					if (found.size() != 1)
 						logger.error(found.size() + " for user " + ((JsonObject) user).getString("name"));
-					}
 				}
 				logger.info("ifollow " + ifollow);
 				logger.info("followsme " + followsme);
@@ -135,11 +130,10 @@ public class MongoConnector extends SyncVerticle {
 				future.fail(ex.getLocalizedMessage());
 			}
 		}), result -> {
-			if (result.succeeded()) {
+			if (result.succeeded())
 				msg.reply(result.result());
-			} else {
+			else
 				msg.fail(1, result.cause().getLocalizedMessage());
-			}
 		});
 	}
 
@@ -149,19 +143,17 @@ public class MongoConnector extends SyncVerticle {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 			FindOptions options = new FindOptions().setSort(new JsonObject().put("name", 1));
 			client.findWithOptions("users", query, options, res -> {
-				if (res.failed()) {
+				if (res.failed())
 					future.fail(res.cause().getLocalizedMessage());
-				}
 				final JsonArray users = new JsonArray();
 				res.result().forEach(users::add);
 				future.complete(users);
 			});
 		}, result -> {
-			if (result.succeeded()) {
+			if (result.succeeded())
 				msg.reply(result.result());
-			} else {
+			else
 				msg.fail(1, result.cause().getLocalizedMessage());
-			}
 		});
 	}
 
@@ -170,19 +162,17 @@ public class MongoConnector extends SyncVerticle {
 		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 			client.find("users", query, res -> {
-				if (res.failed()) {
+				if (res.failed())
 					future.fail(res.cause().getLocalizedMessage());
-				}
 				final JsonArray users = new JsonArray();
 				res.result().forEach(users::add); // expected max one
 				future.complete(users);
 			});
 		}, result -> {
-			if (result.succeeded()) {
+			if (result.succeeded())
 				msg.reply(result.result());
-			} else {
+			else
 				msg.fail(1, result.cause().getLocalizedMessage());
-			}
 		});
 	}
 
