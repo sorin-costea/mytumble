@@ -97,8 +97,10 @@ public class TumblrConnector extends AbstractVerticle {
 			String toLike = msg.body().getString("name");
 			try {
 				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
-				if (client == null)
+				if (client == null) {
 					future.fail("Error: Jumblr not initialized");
+					return;
+				}
 
 				Map<String, Object> params = new HashMap<String, Object>();
 				List<Post> posts = client.blogPosts(toLike, params);
@@ -111,8 +113,15 @@ public class TumblrConnector extends AbstractVerticle {
 						break;
 					}
 				}
-				if (!liked)
+				if (!liked) {
 					logger.info("Reblogger or quiet: " + toLike + " had nothing to like among latest " + posts.size());
+					for (Post post : posts) { // like the first reblog eh
+						if (!post.isLiked()) { // jumblr bug, urls are unusable
+							client.like(post.getId(), post.getReblogKey());
+							break;
+						}
+					}
+				}
 				future.complete(msg.body());
 			} catch (Exception ex) {
 				ex.printStackTrace();
@@ -132,8 +141,10 @@ public class TumblrConnector extends AbstractVerticle {
 			logger.info("Follow " + toFollow);
 			try {
 				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
-				if (client == null)
+				if (client == null) {
 					future.fail("Error: Jumblr not initialized");
+					return;
+				}
 
 				client.follow(toFollow); // no return here
 				future.complete(toFollow);
@@ -155,9 +166,10 @@ public class TumblrConnector extends AbstractVerticle {
 			logger.info("Unfollow " + toUnfollow);
 			try {
 				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
-				if (client == null)
+				if (client == null) {
 					future.fail("Error: Jumblr not initialized");
-
+					return;
+				}
 				client.unfollow(toUnfollow); // no return here
 				future.complete(toUnfollow);
 			} catch (Exception ex) {
@@ -178,9 +190,10 @@ public class TumblrConnector extends AbstractVerticle {
 			logger.info("Posts for " + blogname);
 			try {
 				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
-				if (client == null)
+				if (client == null) {
 					future.fail("Error: Jumblr not initialized");
-
+					return;
+				}
 				Blog myBlog = null;
 				for (Blog blog : client.user().getBlogs()) {
 					if (blog.getName().compareTo(blogname) == 0) {
@@ -188,9 +201,10 @@ public class TumblrConnector extends AbstractVerticle {
 						break;
 					}
 				}
-				if (myBlog == null)
+				if (myBlog == null) {
 					future.fail("Error: Blog name not found - " + blogname);
-
+					return;
+				}
 				int howMany = msg.body().getInteger(0);
 				Map<String, Object> params = new HashMap<String, Object>();
 				params.put("limit", howMany);
@@ -237,26 +251,28 @@ public class TumblrConnector extends AbstractVerticle {
 		vertx.<JsonArray>executeBlocking(future -> {
 			try {
 				JsonArray jsonFollowers = msg.body();
-				if (jsonFollowers.isEmpty())
+				if (jsonFollowers.isEmpty()) {
 					future.fail("No details to load");
+					return;
+				}
 				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
-				if (client == null)
+				if (client == null) {
 					future.fail("Error: Jumblr not initialized");
-
+					return;
+				}
 				int count = 0;
 				loopUsers(jsonFollowers, client, count);
+				vertx.eventBus().send("mytumble.web.status", "Fetched details from Tumblr");
 				future.complete(jsonFollowers);
 			} catch (Exception ex) {
 				ex.printStackTrace();
+				vertx.eventBus().send("mytumble.web.status", "Fetching details failed: " + ex.getLocalizedMessage());
 				future.fail(ex.getLocalizedMessage());
 			}
 		}, result -> {
 			if (result.succeeded()) {
-				vertx.eventBus().send("mytumble.web.status", "Fetched details from Tumblr");
 				msg.reply(result.result());
 			} else {
-				vertx.eventBus().send("mytumble.web.status",
-				        "Fetching details failed: " + result.cause().getLocalizedMessage());
 				msg.fail(1, result.cause().getLocalizedMessage());
 			}
 		});
@@ -277,8 +293,6 @@ public class TumblrConnector extends AbstractVerticle {
 				vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
 				loopUsers(jsonFollowers, client, count + 1);
 			});
-		} else {
-			vertx.eventBus().send("mytumble.web.status", "Finished details from Tumblr");
 		}
 		return count;
 	}
@@ -289,8 +303,10 @@ public class TumblrConnector extends AbstractVerticle {
 			try {
 				long now = new Date().getTime();
 				JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
-				if (client == null)
+				if (client == null) {
 					future.fail("Error: Jumblr not initialized");
+					return;
+				}
 
 				for (Blog blog : client.user().getBlogs()) {
 					if (blog.getName().compareTo(blogname) == 0) {
@@ -298,9 +314,10 @@ public class TumblrConnector extends AbstractVerticle {
 						break;
 					}
 				}
-				if (myBlog == null)
+				if (myBlog == null) {
 					future.fail("Error: Blog name not found - " + blogname);
-
+					return;
+				}
 				Map<String, JsonObject> mapUsers = new HashMap<>();
 				Map<String, String> options = new HashMap<String, String>();
 				int offset = 0, fetched = 0;
@@ -353,9 +370,7 @@ public class TumblrConnector extends AbstractVerticle {
 				ex.printStackTrace();
 				future.fail(ex.getLocalizedMessage());
 			}
-		}, result ->
-
-		{
+		}, result -> {
 			if (result.succeeded()) {
 				vertx.eventBus().send("mytumble.mongo.saveusers", result.result(), saved -> {
 					vertx.eventBus().send("mytumble.web.status", "Refreshed from Tumblr");
