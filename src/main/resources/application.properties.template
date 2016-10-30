@@ -1,9 +1,10 @@
 database.name=demo
+database.collection=demousers
 # this identifies the user performing the actions
 tumblr.username=test
 tumblr.blogname=test
-tumblr.key=key
-tumblr.secret=secret
-# this identifies the consumer application (mytumble)
 tumblr.oauthtoken=token
 tumblr.oauthpass=pass
+# this identifies the consumer application (mytumble)
+tumblr.key=key
+tumblr.secret=secret

@@ -124,8 +124,7 @@ public class TumblrConnector extends AbstractVerticle {
 				}
 				future.complete(msg.body());
 			} catch (Exception ex) {
-				ex.printStackTrace();
-				future.fail(ex.getLocalizedMessage());
+				future.fail("ERROR: Liking latest for " + toLike + ": " + ex.getLocalizedMessage());
 			}
 		}, result -> {
 			if (result.succeeded())
@@ -260,8 +259,7 @@ public class TumblrConnector extends AbstractVerticle {
 					future.fail("Error: Jumblr not initialized");
 					return;
 				}
-				int count = 0;
-				loopUsers(jsonFollowers, client, count);
+				loopLoadUserDetails(jsonFollowers, client);
 				vertx.eventBus().send("mytumble.web.status", "Fetched details from Tumblr");
 				future.complete(jsonFollowers);
 			} catch (Exception ex) {
@@ -278,23 +276,23 @@ public class TumblrConnector extends AbstractVerticle {
 		});
 	}
 
-	private int loopUsers(JsonArray jsonFollowers, JumblrClient client, final int count) {
-		if (jsonFollowers.size() > count) {
-			vertx.setTimer(100, t -> {
-				JsonObject jsonFollower = (JsonObject) jsonFollowers.getJsonObject(count);
-				final int nrCrt = count + 1;
-				logger.info("Info about " + nrCrt + "/" + jsonFollowers.size() + " " + jsonFollower.getString("name"));
-				try {
-					String avatar = client.blogAvatar(jsonFollower.getString("name") + ".tumblr.com");
-					jsonFollower.put("avatarurl", avatar);
-				} catch (JumblrException e) {
-					logger.warn("Getting avatar for" + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
-				}
-				vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
-				loopUsers(jsonFollowers, client, count + 1);
-			});
-		}
-		return count;
+	private void loopLoadUserDetails(JsonArray jsonFollowers, JumblrClient client) {
+		if (jsonFollowers.size() == 0)
+			return;
+		vertx.setTimer(100, t -> {
+			JsonObject jsonFollower = (JsonObject) jsonFollowers.getJsonObject(0);
+			logger.info("Still " + jsonFollowers.size() + ", fetching: " + jsonFollower.getString("name"));
+			try {
+				String avatar = client.blogAvatar(jsonFollower.getString("name") + ".tumblr.com");
+				jsonFollower.put("avatarurl", avatar);
+			} catch (JumblrException e) {
+				logger.warn("Getting avatar for" + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
+			}
+			vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
+			jsonFollowers.remove(0);
+			loopLoadUserDetails(jsonFollowers, client);
+		});
+
 	}
 
 	private void loadUsers(Message<JsonArray> msg) {

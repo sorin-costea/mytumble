@@ -30,7 +30,17 @@ import io.vertx.ext.sync.SyncVerticle;
 public class MongoConnector extends SyncVerticle {
 	static final Logger logger = LoggerFactory.getLogger(MongoConnector.class);
 
+	private String collection;
+
 	private String name;
+
+	public String getCollection() {
+		return collection;
+	}
+
+	public void setCollection(String collection) {
+		this.collection = collection;
+	}
 
 	public String getName() {
 		return name;
@@ -60,7 +70,7 @@ public class MongoConnector extends SyncVerticle {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 				JsonObject update = new JsonObject().put("$set",
 				        new JsonObject().put("followsme", false).put("ifollow", false));
-				MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions("users",
+				MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions(collection,
 				        new JsonObject(), update, new UpdateOptions().setMulti(true), h));
 				logger.info("Users reset: " + res.getDocModified());
 				future.complete("Users reset: " + res.getDocModified());
@@ -82,7 +92,7 @@ public class MongoConnector extends SyncVerticle {
 				MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 				JsonObject user = msg.body();
 				JsonObject newUser = hydrateOldUser(client, (JsonObject) user);
-				client.save("users", newUser, h -> {
+				client.save(collection, newUser, h -> {
 					if (h.failed())
 						logger.info("User upsert failed: " + h.cause().getLocalizedMessage());
 				});
@@ -107,7 +117,7 @@ public class MongoConnector extends SyncVerticle {
 				ArrayList<Object> users = Lists.newArrayList(msg.body());
 				for (Object user : users) {
 					JsonObject newUser = hydrateOldUser(client, (JsonObject) user);
-					String res = awaitResult(h -> client.save("users", newUser, h));
+					String res = awaitResult(h -> client.save(collection, newUser, h));
 					if (res != null) // not sure what that means
 						logger.error(res);
 				}
@@ -127,7 +137,7 @@ public class MongoConnector extends SyncVerticle {
 	@Suspendable
 	private JsonObject hydrateOldUser(MongoClient client, JsonObject newUser) {
 		JsonObject query = new JsonObject().put("name", ((JsonObject) newUser).getString("name"));
-		List<JsonObject> oldUsers = awaitResult(h -> client.find("users", query, h));
+		List<JsonObject> oldUsers = awaitResult(h -> client.find(collection, query, h));
 		if (oldUsers.size() < 1)
 			return newUser;
 		JsonObject oldUser = oldUsers.get(0);
@@ -139,7 +149,7 @@ public class MongoConnector extends SyncVerticle {
 		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
 			FindOptions options = new FindOptions().setSort(new JsonObject().put("name", 1));
-			client.findWithOptions("users", query, options, res -> {
+			client.findWithOptions(collection, query, options, res -> {
 				if (res.failed()) {
 					future.fail(res.cause().getLocalizedMessage());
 					return;
@@ -160,7 +170,7 @@ public class MongoConnector extends SyncVerticle {
 		JsonObject query = new JsonObject().put("name", msg.body().getString(0));
 		vertx.<JsonArray>executeBlocking(future -> {
 			MongoClient client = vertx.getOrCreateContext().get("mongoclient");
-			client.find("users", query, res -> {
+			client.find(collection, query, res -> {
 				if (res.failed()) {
 					future.fail(res.cause().getLocalizedMessage());
 					return;
