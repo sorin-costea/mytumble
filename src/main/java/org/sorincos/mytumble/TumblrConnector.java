@@ -255,11 +255,14 @@ public class TumblrConnector extends AbstractVerticle {
 					JsonArray jsonUsers = new JsonArray();
 					mapUsers.forEach((k, v) -> jsonUsers.add(v));
 					logger.info("Total users: " + jsonUsers.size());
-					vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, saved -> { // TODO logic is all over
-					                                                                        // the program :(
-						vertx.eventBus().send("mytumble.web.status", "Refreshed from Tumblr");
+					// TODO logic is all over the program :(
+					vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, saved -> {
+						vertx.eventBus().send("mytumble.web.status", "Refreshed basic info");
 						vertx.eventBus().send("mytumble.mongo.getusers", "", loaded -> {
-							vertx.eventBus().send("mytumble.tumblr.loaduserdetails", loaded.result().body());
+							vertx.eventBus().send("mytumble.tumblr.loaduserdetails", loaded.result().body(),
+							        detailed -> {
+								        vertx.eventBus().send("mytumble.web.status", "Refreshed also details");
+							        });
 						});
 					});
 					return;
@@ -287,33 +290,15 @@ public class TumblrConnector extends AbstractVerticle {
 	}
 
 	private void loadUsers(Message<JsonArray> msg) {
-		vertx.<JsonArray>executeBlocking(future -> {
-			try {
-				Map<String, JsonObject> mapUsers = new HashMap<>();
-				loopLoadUsers(mapUsers);
-				logger.info("I follow: " + mapUsers.size());
-
-				JsonArray jsonUsers = new JsonArray();
-				mapUsers.forEach((k, v) -> jsonUsers.add(v));
-				logger.info("Total users: " + jsonUsers.size());
-				future.complete(jsonUsers);
-			} catch (Exception ex) {
-				ex.printStackTrace();
-				future.fail(ex.getLocalizedMessage());
-			}
-		}, result -> {
-			if (result.succeeded()) {
-				vertx.eventBus().send("mytumble.mongo.saveusers", result.result(), saved -> {
-					vertx.eventBus().send("mytumble.web.status", "Refreshed from Tumblr");
-					vertx.eventBus().send("mytumble.mongo.getusers", "", loaded -> {
-						vertx.eventBus().send("mytumble.tumblr.loaduserdetails", loaded.result().body());
-					});
-				});
-				msg.reply("Refreshed from Tumblr");
-			} else {
-				vertx.eventBus().send("mytumble.web.status", "Refresh failed: " + result.cause().getLocalizedMessage());
-				msg.fail(1, result.cause().getLocalizedMessage());
-			}
-		});
+		try {
+			Map<String, JsonObject> mapUsers = new HashMap<>();
+			loopLoadUsers(mapUsers);
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			msg.fail(1, ex.getLocalizedMessage());
+			vertx.eventBus().send("mytumble.web.status", "Refresh failed: " + ex.getLocalizedMessage());
+			return;
+		}
+		msg.reply("Refreshed from Tumblr");
 	}
 }
