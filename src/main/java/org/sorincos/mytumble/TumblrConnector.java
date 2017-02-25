@@ -119,7 +119,6 @@ public class TumblrConnector extends AbstractVerticle {
 					}
 				}
 			}
-			msg.reply(msg.body());
 		} catch (Exception ex) {
 			msg.fail(1, "ERROR: Liking latest for " + toLike + ": " + ex.getLocalizedMessage());
 		}
@@ -136,7 +135,6 @@ public class TumblrConnector extends AbstractVerticle {
 			}
 
 			client.follow(toFollow); // no return here
-			msg.reply(toFollow);
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			msg.fail(1, ex.getLocalizedMessage());
@@ -153,7 +151,6 @@ public class TumblrConnector extends AbstractVerticle {
 				return;
 			}
 			client.unfollow(toUnfollow); // no return here
-			msg.reply(toUnfollow);
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			msg.fail(1, ex.getLocalizedMessage());
@@ -162,6 +159,7 @@ public class TumblrConnector extends AbstractVerticle {
 
 	private void loadUserDetails(Message<JsonArray> msg) {
 		try {
+			vertx.eventBus().send("mytumble.web.status", "deeetails");
 			JsonArray jsonFollowers = msg.body();
 			if (jsonFollowers.isEmpty()) {
 				msg.fail(1, "No details to load");
@@ -173,8 +171,6 @@ public class TumblrConnector extends AbstractVerticle {
 				return;
 			}
 			loopLoadUserDetails(jsonFollowers, client);
-			vertx.eventBus().send("mytumble.web.status", "Fetched details from Tumblr");
-			msg.reply(jsonFollowers);
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			vertx.eventBus().send("mytumble.web.status", "Fetching details failed: " + ex.getLocalizedMessage());
@@ -183,8 +179,10 @@ public class TumblrConnector extends AbstractVerticle {
 	}
 
 	private void loopLoadUserDetails(JsonArray jsonFollowers, JumblrClient client) {
-		if (jsonFollowers.size() == 0)
+		if (jsonFollowers.size() == 0) {
+			vertx.eventBus().send("mytumble.web.status", "Fetched details from Tumblr");
 			return;
+		}
 		vertx.setTimer(100, t -> {
 			JsonObject jsonFollower = (JsonObject) jsonFollowers.getJsonObject(0);
 			logger.info("Still " + jsonFollowers.size() + ", fetching: " + jsonFollower.getString("name"));
@@ -201,17 +199,33 @@ public class TumblrConnector extends AbstractVerticle {
 
 	}
 
-	private void loopLoadUsers(Map<String, JsonObject> mapUsers) {
+	private int loopLoadUsers(Map<String, JsonObject> mapUsers, int offset) {
 		JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
 		if (client == null) {
 			logger.error("Error: Jumblr not initialized");
-			return;
+			return -1;
 		}
 		Map<String, String> options = new HashMap<String, String>();
 		long now = new Date().getTime();
 		vertx.setTimer(100, t -> {
-			options.put("offset", Integer.toString(mapUsers.size()));
-			List<Blog> blogs = client.userFollowing(options);
+			options.put("offset", Integer.toString(offset));
+			options.put("limit", "10");
+			List<Blog> blogs = new ArrayList<>();
+			try {
+				blogs = client.userFollowing(options);
+			} catch (Exception e) {
+				logger.info("Error loading blogs I follow: " + e.getLocalizedMessage());
+			}
+			for (Blog blog : blogs) {
+				JsonObject jsonIfollow = new JsonObject();
+				jsonIfollow.put("_id", blog.getName());
+				jsonIfollow.put("name", blog.getName());
+				jsonIfollow.put("lastcheck", now); // who cares???
+				jsonIfollow.put("ifollow", true);
+				jsonIfollow.put("followsme", false);
+				mapUsers.put(blog.getName(), jsonIfollow);
+				logger.info("ifollow: " + mapUsers.size() + "/" + blog.getName());
+			}
 			if (blogs.isEmpty()) {
 				Blog myBlog = null;
 				for (Blog blog : client.user().getBlogs()) {
@@ -229,18 +243,9 @@ public class TumblrConnector extends AbstractVerticle {
 				loopLoadFollowers(mapUsers, 0, myBlog);
 				return;
 			}
-			System.out.print(".");
-			for (Blog blog : blogs) {
-				JsonObject jsonIfollow = new JsonObject();
-				jsonIfollow.put("_id", blog.getName());
-				jsonIfollow.put("name", blog.getName());
-				jsonIfollow.put("lastcheck", now); // who cares???
-				jsonIfollow.put("ifollow", true);
-				jsonIfollow.put("followsme", false);
-				mapUsers.put(blog.getName(), jsonIfollow);
-			}
-			loopLoadUsers(mapUsers);
+			loopLoadUsers(mapUsers, offset + 10);
 		});
+		return 0;
 	}
 
 	private void loopLoadFollowers(Map<String, JsonObject> mapUsers, int offset, Blog myBlog) {
@@ -271,10 +276,10 @@ public class TumblrConnector extends AbstractVerticle {
 				logger.info("Error loading followers at offset " + offset + ": " + e.getLocalizedMessage());
 				followers = new ArrayList<>();
 			}
-			System.out.print(".");
 			for (User follower : followers) {
 				if (mapUsers.get(follower.getName()) != null) {
 					mapUsers.get(follower.getName()).put("followsme", true);
+					logger.info("followsme: " + mapUsers.size() + "/" + follower.getName());
 				} else {
 					JsonObject jsonFollower = new JsonObject();
 					jsonFollower.put("_id", follower.getName());
@@ -283,6 +288,7 @@ public class TumblrConnector extends AbstractVerticle {
 					jsonFollower.put("followsme", true);
 					jsonFollower.put("ifollow", false);
 					mapUsers.put(follower.getName(), jsonFollower);
+					logger.info("followsme: " + "0/" + follower.getName());
 				}
 			}
 			loopLoadFollowers(mapUsers, offset + followers.size(), myBlog);
@@ -291,14 +297,14 @@ public class TumblrConnector extends AbstractVerticle {
 
 	private void loadUsers(Message<JsonArray> msg) {
 		try {
+			vertx.eventBus().send("mytumble.web.status", "loaaaaadin");
 			Map<String, JsonObject> mapUsers = new HashMap<>();
-			loopLoadUsers(mapUsers);
+			loopLoadUsers(mapUsers, 0);
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			msg.fail(1, ex.getLocalizedMessage());
 			vertx.eventBus().send("mytumble.web.status", "Refresh failed: " + ex.getLocalizedMessage());
 			return;
 		}
-		msg.reply("Refreshed from Tumblr");
 	}
 }

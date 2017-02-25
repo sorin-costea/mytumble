@@ -61,6 +61,34 @@ public class MongoConnector extends SyncVerticle {
 		eb.<String>consumer("mytumble.mongo.getusers").handler(this::getUsers);
 		eb.<JsonArray>consumer("mytumble.mongo.getuser").handler(this::getUser);
 		eb.<String>consumer("mytumble.mongo.resetusers").handler(this::resetUsers);
+		eb.<String>consumer("mytumble.mongo.clearusers").handler(this::clearUsers);
+		// eb.<String>consumer("mytumble.mongo.restoreusers").handler(this::restoreUsers);
+	}
+
+	@Suspendable
+	private void clearUsers(Message<String> msg) {
+		// vertx.<String>executeBlocking(fiberHandler(future -> {
+		// try {
+		// loop special users
+		// foreach create minimal json and save in collection2
+		// drop collection
+		// MongoClient client = vertx.getOrCreateContext().get("mongoclient");
+		// JsonObject update = new JsonObject().put("$set",
+		// new JsonObject().put("followsme", false).put("ifollow", false));
+		// MongoClientUpdateResult res = awaitResult(h -> client.updateCollectionWithOptions(collection,
+		// new JsonObject(), update, new UpdateOptions().setMulti(true), h));
+		// logger.info("Users reset: " + res.getDocModified());
+		// future.complete("Users reset: " + res.getDocModified());
+		// } catch (Exception ex) {
+		// ex.printStackTrace();
+		// future.fail(ex.getLocalizedMessage());
+		// }
+		// }), result -> {
+		// if (result.succeeded())
+		// msg.reply(result.result());
+		// else
+		// msg.fail(1, result.cause().getLocalizedMessage());
+		// });
 	}
 
 	@Suspendable
