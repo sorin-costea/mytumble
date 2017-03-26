@@ -83,7 +83,7 @@ public class TumblrConnector extends AbstractVerticle {
 		}
 
 		EventBus eb = vertx.eventBus();
-		eb.<JsonArray>consumer("mytumble.tumblr.loadusers").handler(this::loadUsers);
+		eb.<String>consumer("mytumble.tumblr.loadusers").handler(this::loadUsers);
 		eb.<JsonArray>consumer("mytumble.tumblr.loaduserdetails").handler(this::loadUserDetails);
 		eb.<JsonObject>consumer("mytumble.tumblr.likelatest").handler(this::likeLatest);
 		eb.<String>consumer("mytumble.tumblr.followblog").handler(this::followBlog);
@@ -133,8 +133,8 @@ public class TumblrConnector extends AbstractVerticle {
 				msg.fail(1, "Error: Jumblr not initialized");
 				return;
 			}
-
-			client.follow(toFollow); // no return here
+			client.follow(toFollow);
+			msg.reply(toFollow);
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			msg.fail(1, ex.getLocalizedMessage());
@@ -150,7 +150,8 @@ public class TumblrConnector extends AbstractVerticle {
 				msg.fail(1, "Error: Jumblr not initialized");
 				return;
 			}
-			client.unfollow(toUnfollow); // no return here
+			client.unfollow(toUnfollow);
+			msg.reply(toUnfollow);
 		} catch (Exception ex) {
 			ex.printStackTrace();
 			msg.fail(1, ex.getLocalizedMessage());
@@ -295,7 +296,7 @@ public class TumblrConnector extends AbstractVerticle {
 		});
 	}
 
-	private void loadUsers(Message<JsonArray> msg) {
+	private void loadUsers(Message<String> msg) {
 		try {
 			vertx.eventBus().send("mytumble.web.status", "loaaaaadin");
 			Map<String, JsonObject> mapUsers = new HashMap<>();
@@ -306,5 +307,7 @@ public class TumblrConnector extends AbstractVerticle {
 			vertx.eventBus().send("mytumble.web.status", "Refresh failed: " + ex.getLocalizedMessage());
 			return;
 		}
+		vertx.eventBus().send("mytumble.web.status", "Done refreshing users");
+		msg.reply("Done refreshing users");
 	}
 }
