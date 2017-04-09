@@ -11,6 +11,9 @@ myTumble.factory('MyBackend', [ '$http', function($http) {
     MyBackend.unfollowAsocials = function() {
         return $http.put('/api/status/unfollowasocials');
     };
+    MyBackend.followFolks = function() {
+        return $http.put('/api/status/followfolks');
+    };
     MyBackend.refreshUsers = function() {
         return $http.put('/api/status/refreshusers');
     };
@@ -70,6 +73,14 @@ myTumble.controller('Users', [
                 MyBackend.unfollowAsocials().then(function(response) {
                 }, function(error) {
                     $scope.addLog('Failed to unfollow users: ' + error.message);
+                });
+            };
+
+            $scope.followFolks = function() {
+                $scope.addLog('Following not weird followers');
+                MyBackend.followFolks().then(function(response) {
+                }, function(error) {
+                    $scope.addLog('Failed to follow users: ' + error.message);
                 });
             };
 

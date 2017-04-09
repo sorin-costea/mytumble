@@ -47,6 +47,7 @@ public class WebServer extends SyncVerticle {
 		router.put("/api/status/refreshusers").handler(fiberHandler(this::refreshUsers));
 		router.put("/api/status/likeusers").handler(fiberHandler(this::likeUsers));
 		router.put("/api/status/unfollowasocials").handler(fiberHandler(this::unfollowAsocials));
+		router.put("/api/status/followfolks").handler(fiberHandler(this::followFolks));
 
 		// modifying stuff
 		router.put("/api/users/:name").handler(fiberHandler(this::updateUser));
@@ -79,11 +80,45 @@ public class WebServer extends SyncVerticle {
 		}
 	}
 
+	private void followFolks(RoutingContext ctx) {
+		logger.info("Following back not weird followers");
+
+		try {
+			vertx.eventBus().send("mytumble.mongo.getusers", "followsme,notweird,notifollow", options, result -> {
+				ArrayList<Object> notFolloweds = Lists.newArrayList((JsonArray) result.result().body());
+				loopFollowFolks(notFolloweds);
+				vertx.eventBus().send("mytumble.web.status", "Followed folks");
+			});
+			ctx.response().setStatusCode(200).end();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			if (ctx.response().ended())
+				vertx.eventBus().send("mytumble.web.status", "Following folks failed: " + ex.getLocalizedMessage());
+			else
+				ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+		}
+	}
+
+	private void loopFollowFolks(ArrayList<Object> notFolloweds) {
+		if (notFolloweds.size() == 0)
+			return;
+		JsonObject notFollowed = (JsonObject) notFolloweds.get(0);
+		vertx.setTimer(1000, t -> {
+			vertx.eventBus().send("mytumble.tumblr.followblog", notFollowed.getString("name"), done -> {
+				notFollowed.put("ifollow", true);
+				vertx.eventBus().send("mytumble.mongo.saveuser", notFollowed, save -> {
+					notFolloweds.remove(0);
+					loopFollowFolks(notFolloweds);
+				});
+			});
+		});
+	}
+
 	private void loopUnfollowAsocial(ArrayList<Object> notFollowers) {
 		if (notFollowers.size() == 0)
 			return;
 		JsonObject notFollower = (JsonObject) notFollowers.get(0);
-		vertx.setTimer(100, t -> {
+		vertx.setTimer(1000, t -> {
 			vertx.eventBus().send("mytumble.tumblr.unfollowblog", notFollower.getString("name"), done -> {
 				notFollower.put("ifollow", false);
 				vertx.eventBus().send("mytumble.mongo.saveuser", notFollower, save -> {
@@ -118,7 +153,7 @@ public class WebServer extends SyncVerticle {
 			return;
 		}
 		JsonObject liker = (JsonObject) likers.get(0);
-		vertx.setTimer(100, t -> {
+		vertx.setTimer(1000, t -> {
 			vertx.eventBus().send("mytumble.tumblr.likelatest", liker, done -> {
 			});
 			likers.remove(0);
