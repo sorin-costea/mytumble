@@ -5,7 +5,7 @@
 
 	<groupId>org.sorincos</groupId>
 	<artifactId>mytumble</artifactId>
-	<version>2.3.0-SNAPSHOT</version>
+	<version>2.4.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<name>mytumble</name>
@@ -14,17 +14,24 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>1.4.3.RELEASE</version>
+		<version>1.5.8.RELEASE</version>
 		<relativePath /> <!-- lookup parent from repository -->
 	</parent>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<java.version>1.8</java.version>
-		<vertx.version>3.3.3</vertx.version>
-		<jumblr.version>0.0.11</jumblr.version>
+		<vertx.version>3.5.0</vertx.version>
+		<jumblr.version>ec8a11a</jumblr.version>
 	</properties>
-
+	
+	<repositories>
+		<repository>
+			<id>jitpack.io</id>
+			<url>https://jitpack.io</url>
+		</repository>
+	</repositories>
+	
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -83,14 +90,14 @@
 			<version>0.7.0</version>
 		</dependency>
 		<dependency>
-			<groupId>com.tumblr</groupId>
+			<groupId>com.github.tumblr</groupId>
 			<artifactId>jumblr</artifactId>
 			<version>${jumblr.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.guava</groupId>
 			<artifactId>guava</artifactId>
-			<version>21.0</version>
+			<version>23.0</version>
 		</dependency>
 	</dependencies>
 

@@ -184,20 +184,22 @@ public class TumblrConnector extends AbstractVerticle {
 			vertx.eventBus().send("mytumble.web.status", "Fetched details from Tumblr");
 			return;
 		}
-		vertx.setTimer(1000, t -> {
+		vertx.setTimer(500, t -> {
 			JsonObject jsonFollower = (JsonObject) jsonFollowers.getJsonObject(0);
-			logger.info("Still " + jsonFollowers.size() + ", fetching: " + jsonFollower.getString("name"));
-			try {
-				String avatar = client.blogAvatar(jsonFollower.getString("name") + ".tumblr.com");
-				jsonFollower.put("avatarurl", avatar);
-			} catch (Exception e) {
-				logger.warn("Getting avatar for " + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
-			}
-			vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
+			if (jsonFollower.getString("avatarurl", "") == "") {
+				logger.info("Still " + jsonFollowers.size() + ", fetching: " + jsonFollower.getString("name"));
+				try {
+					String avatar = client.blogAvatar(jsonFollower.getString("name") + ".tumblr.com");
+					jsonFollower.put("avatarurl", avatar);
+				} catch (Exception e) {
+					logger.warn(
+					        "Getting avatar for " + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
+				}
+				vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
+			} // no need to
 			jsonFollowers.remove(0);
 			loopLoadUserDetails(jsonFollowers, client);
 		});
-
 	}
 
 	private int loopLoadUsers(Map<String, JsonObject> mapUsers, int offset) {
@@ -208,7 +210,7 @@ public class TumblrConnector extends AbstractVerticle {
 		}
 		Map<String, String> options = new HashMap<String, String>();
 		long now = new Date().getTime();
-		vertx.setTimer(1000, t -> {
+		vertx.setTimer(500, t -> {
 			options.put("offset", Integer.toString(offset));
 			List<Blog> blogs = new ArrayList<>();
 			try {
@@ -251,7 +253,7 @@ public class TumblrConnector extends AbstractVerticle {
 	private void loopLoadFollowers(Map<String, JsonObject> mapUsers, int offset, Blog myBlog) {
 		Map<String, String> options = new HashMap<String, String>();
 		long now = new Date().getTime();
-		vertx.setTimer(1000, t -> {
+		vertx.setTimer(500, t -> {
 			options.put("offset", Integer.toString(offset));
 			List<User> followers;
 			try {

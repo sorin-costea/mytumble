@@ -33,6 +33,52 @@ public class TumblrConnectorTests {
 
 	private TumblrConnector tumblrConnVerticle;
 
+	private String key;
+	private String secret;
+	private String oauthtoken;
+	private String oauthpass;
+	private String blogname;
+
+	public String getKey() {
+		return key;
+	}
+
+	public void setKey(String key) {
+		this.key = key;
+	}
+
+	public String getSecret() {
+		return secret;
+	}
+
+	public void setSecret(String secret) {
+		this.secret = secret;
+	}
+
+	public String getOauthtoken() {
+		return oauthtoken;
+	}
+
+	public void setOauthtoken(String login) {
+		this.oauthtoken = login;
+	}
+
+	public String getOauthpass() {
+		return oauthpass;
+	}
+
+	public void setOauthpass(String password) {
+		this.oauthpass = password;
+	}
+
+	public String getBlogname() {
+		return blogname;
+	}
+
+	public void setBlogname(String blogname) {
+		this.blogname = blogname;
+	}
+
 	@Mock
 	private Vertx vertx;
 
@@ -92,4 +138,19 @@ public class TumblrConnectorTests {
 		// verify(netClient, times(1)).connect(Matchers.eq(1234), Matchers.eq("foo"),
 		// Matchers.<Handler<AsyncResult<NetSocket>>>any());
 	}
+
+	@Test
+	public void loadUserDetails() {
+		final String name = "o-noapte-de-aprilie";
+		String avatar = "a";
+		try {
+			JumblrClient client = new JumblrClient(key, secret);
+			client.setToken(oauthtoken, oauthpass);
+			avatar = client.blogAvatar(name + ".tumblr.com");
+			System.out.println("Getting avatar for " + name + ": " + avatar);
+		} catch (Exception e) {
+			System.out.println("Getting avatar for " + name + ": " + e.getLocalizedMessage());
+		}
+	}
+
 }
