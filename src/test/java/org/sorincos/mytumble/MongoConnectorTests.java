@@ -27,64 +27,64 @@ import io.vertx.core.json.JsonObject;
 @ConfigurationProperties(prefix = "database")
 public class MongoConnectorTests {
 
-	private String name;
+    private String name;
 
-	private MongoConnector mongoConnVerticle;
+    private MongoConnector mongoConnVerticle;
 
-	@Mock
-	private VertxImpl vertx;
+    @Mock
+    private VertxImpl vertx;
 
-	@Mock
-	private ContextImpl context;
+    @Mock
+    private ContextImpl context;
 
-	@Mock
-	private EventBus eventBus;
+    @Mock
+    private EventBus eventBus;
 
-	@Mock
-	private Future<Void> startFuture;
+    @Mock
+    private Future<Void> startFuture;
 
-	public String getName() {
-		return name;
-	}
+    public String getName() {
+        return name;
+    }
 
-	public void setName(String name) {
-		this.name = name;
-	}
+    public void setName(String name) {
+        this.name = name;
+    }
 
-	@Before
-	public void setUp() {
-		MockitoAnnotations.initMocks(this);
+    @Before
+    public void setUp() {
+        MockitoAnnotations.initMocks(this);
 
-		when(vertx.eventBus()).thenReturn(eventBus);
-		doReturn(context).when(vertx).getOrCreateContext();
-		doReturn(context).when(vertx).getContext();
+        when(vertx.eventBus()).thenReturn(eventBus);
+        doReturn(context).when(vertx).getOrCreateContext();
+        doReturn(context).when(vertx).getContext();
 
-		mongoConnVerticle = new MongoConnector();
-		mongoConnVerticle.init(vertx, context);
+        mongoConnVerticle = new MongoConnector();
+        mongoConnVerticle.init(vertx, context);
 
-	}
+    }
 
-	@After
-	public void tearDown() throws Exception {
-		if (mongoConnVerticle != null)
-			mongoConnVerticle.stop();
-	}
+    @After
+    public void tearDown() throws Exception {
+        if (mongoConnVerticle != null)
+            mongoConnVerticle.stop();
+    }
 
-	@Test
-	public void contextLoads() {
-		Assert.assertNotNull(name);
-	}
+    @Test
+    public void contextLoads() {
+        Assert.assertNotNull(name);
+    }
 
-	@Test
-	public void testStartValidConfig() throws Exception {
-		JsonObject config = new JsonObject("{}");
-		when(context.config()).thenReturn(config);
+    @Test
+    public void testStartValidConfig() throws Exception {
+        JsonObject config = new JsonObject("{}");
+        when(context.config()).thenReturn(config);
 
-		mongoConnVerticle.start(startFuture);
+        mongoConnVerticle.start(startFuture);
 
-		verify(context, times(1)).config();
-		verify(vertx, times(1)).eventBus();
-		// verify(netClient, times(1)).connect(Matchers.eq(1234), Matchers.eq("foo"),
-		// Matchers.<Handler<AsyncResult<NetSocket>>>any());
-	}
+        verify(context, times(1)).config();
+        verify(vertx, times(1)).eventBus();
+        // verify(netClient, times(1)).connect(Matchers.eq(1234), Matchers.eq("foo"),
+        // Matchers.<Handler<AsyncResult<NetSocket>>>any());
+    }
 }

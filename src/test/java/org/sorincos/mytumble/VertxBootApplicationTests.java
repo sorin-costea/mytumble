@@ -12,19 +12,19 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 @ConfigurationProperties(prefix = "database")
 public class VertxBootApplicationTests {
 
-	private String name;
+    private String name;
 
-	@Test
-	public void contextLoads() {
-		Assert.assertNotNull(name);
-	}
+    @Test
+    public void contextLoads() {
+        Assert.assertNotNull(name);
+    }
 
-	public String getName() {
-		return name;
-	}
+    public String getName() {
+        return name;
+    }
 
-	public void setName(String name) {
-		this.name = name;
-	}
+    public void setName(String name) {
+        this.name = name;
+    }
 
 }
