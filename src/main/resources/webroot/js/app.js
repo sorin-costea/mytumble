@@ -68,6 +68,14 @@ myTumble.controller('Users', [
                 });
             };
 
+            $scope.likeReverseUsers = function(filter) {
+                $scope.addLog('Liking reverse users (' + filter + ')');
+                MyBackend.likeUsers('?filter=' + filter + '&reverse=true').then(function(response) {
+                }, function(error) {
+                    $scope.addLog('Failed to reverse like users (' + filter + '): ' + error.message);
+                });
+            };
+
             $scope.unfollowAsocials = function() {
                 $scope.addLog('Unfollowing those who don\'t follow back');
                 MyBackend.unfollowAsocials().then(function(response) {

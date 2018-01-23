@@ -181,6 +181,7 @@ public class TumblrConnector extends AbstractVerticle {
 
 	private void loopLoadUserDetails(JsonArray jsonFollowers, JumblrClient client) {
 		if (jsonFollowers.size() == 0) {
+			logger.info("Done loading details.");
 			vertx.eventBus().send("mytumble.web.status", "Fetched details from Tumblr");
 			return;
 		}
@@ -241,6 +242,7 @@ public class TumblrConnector extends AbstractVerticle {
 					return;
 				}
 				int numFollowers = myBlog.getFollowersCount();
+				logger.info("Following (theoretically): " + mapUsers.size());
 				logger.info("Followers (theoretically): " + numFollowers);
 				loopLoadFollowers(mapUsers, 0, myBlog);
 				return;
@@ -258,6 +260,10 @@ public class TumblrConnector extends AbstractVerticle {
 			List<User> followers;
 			try {
 				followers = myBlog.followers(options);
+				if (followers.isEmpty()) { // one last chance
+					options.put("offset", Integer.toString(offset + 10));
+					followers = myBlog.followers(options);
+				}
 				if (followers.isEmpty()) {
 					JsonArray jsonUsers = new JsonArray();
 					mapUsers.forEach((k, v) -> jsonUsers.add(v));

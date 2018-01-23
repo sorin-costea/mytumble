@@ -3,6 +3,7 @@ package org.sorincos.mytumble;
 import static io.vertx.ext.sync.Sync.fiberHandler;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,11 +132,15 @@ public class WebServer extends SyncVerticle {
 
 	private void likeUsers(RoutingContext ctx) {
 		String filter = ctx.request().getParam("filter");
+		String reverse = ctx.request().getParam("reverse");
 		try {
 			vertx.eventBus().send("mytumble.mongo.getusers", filter, options, result -> {
 				logger.info("Liking " + filter + ": " + ((JsonArray) result.result().body()).size());
-				ArrayList<Object> likers = Lists.newArrayList((JsonArray) result.result().body());
-				loopLikeUsers(likers);
+				List<Object> likers = Lists.newArrayList((JsonArray) result.result().body());
+				if (reverse != null)
+					loopLikeUsers(Lists.reverse(likers));
+				else
+					loopLikeUsers(likers);
 			});
 			ctx.response().setStatusCode(200).end();
 		} catch (Exception ex) {
@@ -147,7 +152,7 @@ public class WebServer extends SyncVerticle {
 		}
 	}
 
-	private void loopLikeUsers(ArrayList<Object> likers) {
+	private void loopLikeUsers(List<Object> likers) {
 		if (likers.size() == 0) {
 			vertx.eventBus().send("mytumble.web.status", "Liked latest posts");
 			return;
