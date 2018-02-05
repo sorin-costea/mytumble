@@ -103,21 +103,27 @@ public class TumblrConnector extends AbstractVerticle {
             List<Post> posts = client.blogPosts(toLike, params);
             boolean liked = false;
             for (Post post : posts) { // no use to like reblogs or what already liked
-                if (post.getSourceUrl() == null && !post.isLiked()) { // jumblr bug, urls are unusable
+                if (post.getSourceUrl() == null && !post.isLiked()) {
                     client.like(post.getId(), post.getReblogKey());
-                    // logger.info(toLike + " liked " + post.getShortUrl());
+                    logger.info("Original for " + toLike + ": " + post.getShortUrl() + "/" + post.getAuthorId() + "/"
+                            + post.getRebloggedRootName());
                     liked = true;
                     break;
                 }
             }
             if (!liked) {
-                logger.info("Reblogger or quiet: " + toLike + " had nothing to like among latest " + posts.size());
-                for (Post post : posts) { // like the first reblog eh
-                    if (!post.isLiked()) { // jumblr bug, urls are unusable
+                for (Post post : posts) { // like the first reblog but not mine
+                    if (!post.isLiked() && !post.getSourceUrl().contains(blogname)) {
                         client.like(post.getId(), post.getReblogKey());
+                        logger.info("Liked for " + toLike + ": " + post.getShortUrl() + "/" + post.getAuthorId() + "/"
+                                + post.getRebloggedRootName());
+                        liked = true;
                         break;
                     }
                 }
+            }
+            if (!liked) {
+                logger.info("Nothing to like among latest " + posts.size() + ": " + toLike);
             }
         } catch (Exception ex) {
             msg.fail(1, "ERROR: Liking latest for " + toLike + ": " + ex.getLocalizedMessage());
