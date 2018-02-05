@@ -4,13 +4,15 @@ import javax.annotation.PostConstruct;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-import co.paralleluniverse.fibers.Suspendable;
-import co.paralleluniverse.springframework.boot.autoconfigure.web.FiberSpringBootApplication;
+//import co.paralleluniverse.fibers.Suspendable;
+//import co.paralleluniverse.springframework.boot.autoconfigure.web.FiberSpringBootApplication;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 
-@FiberSpringBootApplication
+//@FiberSpringBootApplication
+@SpringBootApplication
 public class VertxBootApplication {
 
     @Autowired
@@ -23,7 +25,7 @@ public class VertxBootApplication {
     private MongoConnector mongoConnector;
 
     @PostConstruct
-    @Suspendable
+    // @Suspendable
     public void deployVerticle() {
         VertxOptions options = new VertxOptions();
         options.setBlockedThreadCheckInterval(1000 * 60 * 60);
@@ -33,7 +35,7 @@ public class VertxBootApplication {
         vertx.deployVerticle(tumblrConnector);
     }
 
-    @Suspendable
+    // @Suspendable
     public static void main(String[] args) {
         SpringApplication.run(VertxBootApplication.class, args);
     }

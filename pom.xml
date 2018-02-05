@@ -77,7 +77,7 @@
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
         </dependency>
-        <dependency>
+<!--         <dependency>
             <groupId>co.paralleluniverse</groupId>
             <artifactId>quasar-core</artifactId>
             <version>0.7.7</version>
@@ -87,7 +87,7 @@
             <groupId>co.paralleluniverse</groupId>
             <artifactId>comsat-spring-boot</artifactId>
             <version>0.7.0</version>
-        </dependency>
+        </dependency> -->
         <dependency>
             <groupId>com.github.tumblr</groupId>
             <artifactId>jumblr</artifactId>
