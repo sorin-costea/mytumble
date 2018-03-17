@@ -103,7 +103,7 @@ public class TumblrConnector extends AbstractVerticle {
             List<Post> posts = client.blogPosts(toLike, params);
             boolean liked = false;
             for (Post post : posts) { // no use to like reblogs or what already liked
-                if (post.getSourceUrl() == null && !post.isLiked()) {
+                if ((post.getSourceUrl() == null || post.getSourceUrl() == "") && !post.isLiked()) {
                     client.like(post.getId(), post.getReblogKey());
                     logger.info("Original for " + toLike + ": " + post.getShortUrl() + "/" + post.getAuthorId() + "/"
                             + post.getRebloggedRootName());
@@ -113,7 +113,8 @@ public class TumblrConnector extends AbstractVerticle {
             }
             if (!liked) {
                 for (Post post : posts) { // like the first reblog but not mine
-                    if (!post.isLiked() && !post.getSourceUrl().contains(blogname)) {
+                    if (!post.isLiked() && post.getSourceUrl() != null && post.getSourceUrl() != ""
+                            && !post.getSourceUrl().contains(blogname)) {
                         client.like(post.getId(), post.getReblogKey());
                         logger.info("Liked for " + toLike + ": " + post.getShortUrl() + "/" + post.getAuthorId() + "/"
                                 + post.getRebloggedRootName());
@@ -121,9 +122,9 @@ public class TumblrConnector extends AbstractVerticle {
                         break;
                     }
                 }
-            }
-            if (!liked) {
-                logger.info("Nothing to like among latest " + posts.size() + ": " + toLike);
+                if (!liked) {
+                    logger.info("Nothing to like among latest " + posts.size() + ": " + toLike);
+                }
             }
         } catch (Exception ex) {
             msg.fail(1, "ERROR: Liking latest for " + toLike + ": " + ex.getLocalizedMessage());
@@ -259,6 +260,7 @@ public class TumblrConnector extends AbstractVerticle {
     }
 
     private void loopLoadFollowers(Map<String, JsonObject> mapUsers, int offset, Blog myBlog) {
+        logger.info("---loop load: " + offset);
         Map<String, String> options = new HashMap<String, String>();
         long now = new Date().getTime();
         vertx.setTimer(500, t -> {
@@ -269,6 +271,7 @@ public class TumblrConnector extends AbstractVerticle {
                 if (followers.isEmpty()) { // one last chance
                     options.put("offset", Integer.toString(offset + 10));
                     followers = myBlog.followers(options);
+                    logger.info("Last chance gave: " + followers.size());
                 }
                 if (followers.isEmpty()) {
                     JsonArray jsonUsers = new JsonArray();
@@ -305,6 +308,7 @@ public class TumblrConnector extends AbstractVerticle {
                     logger.info("followsme: " + "0/" + follower.getName());
                 }
             }
+            logger.info("---loop loaded: " + offset);
             loopLoadFollowers(mapUsers, offset + followers.size(), myBlog);
         });
     }
