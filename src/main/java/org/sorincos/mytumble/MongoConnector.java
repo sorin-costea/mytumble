@@ -4,6 +4,7 @@ import static io.vertx.ext.sync.Sync.awaitResult;
 import static io.vertx.ext.sync.Sync.fiberHandler;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -32,6 +33,8 @@ public class MongoConnector extends SyncVerticle {
 
     private String collection;
 
+    private String loads;
+
     private String name;
 
     public String getCollection() {
@@ -50,6 +53,14 @@ public class MongoConnector extends SyncVerticle {
         this.name = database;
     }
 
+    public String getLoads() {
+        return loads;
+    }
+
+    public void setLoads(String loads) {
+        this.loads = loads;
+    }
+
     @Override
     public void start() throws Exception {
         MongoClient mongo = MongoClient.createShared(vertx, new JsonObject().put("db_name", name));
@@ -61,6 +72,7 @@ public class MongoConnector extends SyncVerticle {
         eb.<String>consumer("mytumble.mongo.getusers").handler(this::getUsers);
         eb.<JsonArray>consumer("mytumble.mongo.getuser").handler(this::getUser);
         eb.<String>consumer("mytumble.mongo.resetusers").handler(this::resetUsers);
+        eb.<JsonObject>consumer("mytumble.mongo.startload").handler(this::startLoad);
         eb.<String>consumer("mytumble.mongo.clearusers").handler(this::clearUsers);
         // eb.<String>consumer("mytumble.mongo.restoreusers").handler(this::restoreUsers);
     }
@@ -114,6 +126,32 @@ public class MongoConnector extends SyncVerticle {
         });
     }
 
+    @Suspendable
+    private void startLoad(Message<JsonObject> msg) {
+        vertx.<JsonObject>executeBlocking(fiberHandler(future -> {
+            try {
+                MongoClient client = vertx.getOrCreateContext().get("mongoclient");
+                long now = new Date().getTime();
+                JsonObject load = new JsonObject();
+                load.put("timestamp", now);
+                String id = awaitResult(h -> client.insert(loads, load, h));
+
+                logger.info("Starting load: " + id);
+                load.put("_id", id);
+                future.complete(load);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                future.fail(ex.getLocalizedMessage());
+            }
+        }), result -> {
+            if (result.succeeded())
+                msg.reply(result.result());
+            else
+                msg.fail(1, result.cause().getLocalizedMessage());
+        });
+    }
+
+    @Suspendable
     private void saveUser(Message<JsonObject> msg) {
         vertx.<JsonObject>executeBlocking(fiberHandler(future -> {
             try {

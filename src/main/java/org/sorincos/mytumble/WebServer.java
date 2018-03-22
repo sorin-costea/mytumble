@@ -186,8 +186,8 @@ public class WebServer extends SyncVerticle {
         logger.info("Refresh followers");
 
         try {
-            vertx.eventBus().send("mytumble.mongo.resetusers", null, resetted -> {
-                vertx.eventBus().send("mytumble.tumblr.loadusers", null, options);
+            vertx.eventBus().send("mytumble.mongo.startload", null, newload -> {
+                vertx.eventBus().send("mytumble.tumblr.loadusers", newload.result().body(), options);
             });
             ctx.response().setStatusCode(200).end();
         } catch (Exception ex) {
