@@ -33,6 +33,7 @@ public class TumblrConnector extends AbstractVerticle {
     private String oauthtoken;
     private String oauthpass;
     private String blogname;
+    private String timeoutSeconds;
 
     public String getKey() {
         return key;
@@ -73,12 +74,17 @@ public class TumblrConnector extends AbstractVerticle {
     public void setBlogname(String blogname) {
         this.blogname = blogname;
     }
+    
+    public void setTimeoutSeconds(String timeoutSeconds) {
+        this.timeoutSeconds = timeoutSeconds;
+    }
 
     @Override
     public void start() throws Exception {
         if (vertx.getOrCreateContext().get("jumblrclient") == null) {
             JumblrClient client = new JumblrClient(key, secret);
             client.setToken(oauthtoken, oauthpass);
+            client.getRequestBuilder().setTimeoutSeconds(Integer.valueOf(timeoutSeconds));
             vertx.getOrCreateContext().put("jumblrclient", client);
         }
 
