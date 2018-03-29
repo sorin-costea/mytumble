@@ -22,7 +22,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
         <vertx.version>3.5.0</vertx.version>
-        <jumblr.version>ec8a11a</jumblr.version>
+        <jumblr.version>75e634d</jumblr.version>
     </properties>
 
     <repositories>
@@ -89,7 +89,7 @@
             <version>0.7.0</version>
         </dependency>
         <dependency>
-            <groupId>com.github.tumblr</groupId>
+            <groupId>com.github.sorin-costea</groupId>
             <artifactId>jumblr</artifactId>
             <version>${jumblr.version}</version>
         </dependency>

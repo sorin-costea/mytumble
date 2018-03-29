@@ -1,5 +1,6 @@
 database.name=demo
 database.collection=demousers
+tumblr.timeoutSeconds=30
 # this identifies the user performing the actions
 tumblr.username=test
 tumblr.blogname=test
