@@ -224,12 +224,14 @@ public class TumblrConnector extends AbstractVerticle {
         }
         Map<String, String> options = new HashMap<String, String>();
         long now = new Date().getTime();
+        vertx.setTimer(1000, t -> {
             options.put("offset", Integer.toString(offset));
             List<Blog> blogs = new ArrayList<>();
             try {
                 blogs = client.userFollowing(options);
             } catch (Exception e) {
                 logger.info("Error loading blogs I follow: " + e.getLocalizedMessage());
+                try {
                     blogs = client.userFollowing(options);
                 } catch (Exception e1) {
                     logger.info("Error retrying loading blogs I follow: " + e.getLocalizedMessage());
