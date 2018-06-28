@@ -73,19 +73,19 @@
 			<button ng-click="likeUsers('ifollow')">Like I follow</button>
 			<button ng-click="likeReverseUsers('ifollow')">Like reverse I follow</button>
 			<button ng-click="likeUsers('special')">Like specials</button>
-			<button ng-click="refreshUsers()">Refresh users</button>
+            <button ng-click="refreshUsers()">Refresh users</button>
 			<button ng-click="loadUsers('notfollowsme,notifollow')">We
-				lost contact</button>
+				lost contact</button><br/>
 		</nav>
 		<aside class="HolyGrail-ads">
 			<div ng-repeat="message in messages">{{ message.timestamp |
 				date:'HH:mm:ss.sss'}}: {{ message.text }}</div>
 		</aside>
 	</div>
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.6.5/angular.js"></script>
 	<script
-		src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.5.8/angular.js"></script>
-	<script
-		src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.1/sockjs.js"></script>
+		src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.4/sockjs.js"></script>
 	<script type="text/javascript" src="/js/vertx-eventbus.js"></script>
 	<script type="text/javascript" src="/js/app.js"></script>
 </body>

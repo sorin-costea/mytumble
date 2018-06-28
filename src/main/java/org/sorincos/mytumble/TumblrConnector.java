@@ -198,7 +198,7 @@ public class TumblrConnector extends AbstractVerticle {
             vertx.eventBus().send("mytumble.web.status", "Fetched details from Tumblr");
             return;
         }
-        vertx.setTimer(500, t -> {
+        vertx.setTimer(1000, t -> {
             JsonObject jsonFollower = (JsonObject) jsonFollowers.getJsonObject(0);
             if (jsonFollower.getString("avatarurl", "") == "") {
                 logger.info("Still " + jsonFollowers.size() + ", fetching: " + jsonFollower.getString("name"));
@@ -224,13 +224,21 @@ public class TumblrConnector extends AbstractVerticle {
         }
         Map<String, String> options = new HashMap<String, String>();
         long now = new Date().getTime();
-        vertx.setTimer(500, t -> {
             options.put("offset", Integer.toString(offset));
             List<Blog> blogs = new ArrayList<>();
             try {
                 blogs = client.userFollowing(options);
             } catch (Exception e) {
                 logger.info("Error loading blogs I follow: " + e.getLocalizedMessage());
+                    blogs = client.userFollowing(options);
+                } catch (Exception e1) {
+                    logger.info("Error retrying loading blogs I follow: " + e.getLocalizedMessage());
+                    try {
+                        blogs = client.userFollowing(options);
+                    } catch (Exception e2) {
+                        logger.info("Giving up retrying loading blogs I follow: " + e.getLocalizedMessage());
+                    }
+                }
             }
             for (Blog blog : blogs) {
                 JsonObject jsonIfollow = new JsonObject();
@@ -269,7 +277,7 @@ public class TumblrConnector extends AbstractVerticle {
         logger.info("---loop load: " + offset);
         Map<String, String> options = new HashMap<String, String>();
         long now = new Date().getTime();
-        vertx.setTimer(500, t -> {
+        vertx.setTimer(1000, t -> {
             options.put("offset", Integer.toString(offset));
             List<User> followers;
             try {
