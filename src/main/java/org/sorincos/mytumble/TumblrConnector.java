@@ -74,7 +74,7 @@ public class TumblrConnector extends AbstractVerticle {
     public void setBlogname(String blogname) {
         this.blogname = blogname;
     }
-    
+
     public void setTimeoutSeconds(String timeoutSeconds) {
         this.timeoutSeconds = timeoutSeconds;
     }
@@ -111,8 +111,7 @@ public class TumblrConnector extends AbstractVerticle {
             for (Post post : posts) { // no use to like reblogs or what already liked
                 if ((post.getSourceUrl() == null || post.getSourceUrl() == "") && !post.isLiked()) {
                     client.like(post.getId(), post.getReblogKey());
-                    logger.info("Original for " + toLike + ": " + post.getShortUrl() + "/" + post.getAuthorId() + "/"
-                            + post.getRebloggedRootName());
+                    logger.info("Original for " + toLike + ": " + post.getShortUrl() + "/" + post.getSourceTitle());
                     liked = true;
                     break;
                 }
@@ -120,10 +119,9 @@ public class TumblrConnector extends AbstractVerticle {
             if (!liked) {
                 for (Post post : posts) { // like the first reblog but not mine
                     if (!post.isLiked() && post.getSourceUrl() != null && post.getSourceUrl() != ""
-                            && !post.getSourceUrl().contains(blogname)) {
+                            && post.getSourceTitle().compareToIgnoreCase(blogname) != 0) {
                         client.like(post.getId(), post.getReblogKey());
-                        logger.info("Liked for " + toLike + ": " + post.getShortUrl() + "/" + post.getAuthorId() + "/"
-                                + post.getRebloggedRootName());
+                        logger.info("Liked for " + toLike + ": " + post.getShortUrl() + "/" + post.getSourceTitle());
                         liked = true;
                         break;
                     }
@@ -184,7 +182,12 @@ public class TumblrConnector extends AbstractVerticle {
                 msg.fail(1, "Error: Jumblr not initialized");
                 return;
             }
-            loopLoadUserDetails(jsonFollowers, client);
+            JsonArray jsonEmptyFollowers = new JsonArray();
+            jsonFollowers.forEach(jsonFollower -> {
+                if (((JsonObject) jsonFollower).getString("avatarurl", "") == "")
+                    jsonEmptyFollowers.add(jsonFollower);
+            });
+            loopLoadUserDetails(jsonEmptyFollowers, client);
         } catch (Exception ex) {
             ex.printStackTrace();
             vertx.eventBus().send("mytumble.web.status", "Fetching details failed: " + ex.getLocalizedMessage());
@@ -200,17 +203,14 @@ public class TumblrConnector extends AbstractVerticle {
         }
         vertx.setTimer(1000, t -> {
             JsonObject jsonFollower = (JsonObject) jsonFollowers.getJsonObject(0);
-            if (jsonFollower.getString("avatarurl", "") == "") {
-                logger.info("Still " + jsonFollowers.size() + ", fetching: " + jsonFollower.getString("name"));
-                try {
-                    String avatar = client.blogAvatar(jsonFollower.getString("name") + ".tumblr.com");
-                    jsonFollower.put("avatarurl", avatar);
-                } catch (Exception e) {
-                    logger.warn(
-                            "Getting avatar for " + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
-                }
-                vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
-            } // no need to
+            logger.info("Still " + jsonFollowers.size() + ", fetching: " + jsonFollower.getString("name"));
+            try {
+                String avatar = client.blogAvatar(jsonFollower.getString("name") + ".tumblr.com");
+                jsonFollower.put("avatarurl", avatar);
+            } catch (Exception e) {
+                logger.warn("Getting avatar for " + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
+            }
+            vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
             jsonFollowers.remove(0);
             loopLoadUserDetails(jsonFollowers, client);
         });
