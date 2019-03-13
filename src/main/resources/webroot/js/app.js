@@ -5,6 +5,9 @@ myTumble.factory('MyBackend', [ '$http', function($http) {
     MyBackend.getUsers = function(filter) {
         return $http.get('/api/users' + filter);
     };
+    MyBackend.processedUsers = function(filter) {
+        return $http.get('/api/processedusers' + filter);
+    };
     MyBackend.likeUsers = function(filter) {
         return $http.put('/api/status/likeusers' + filter);
     };
@@ -19,6 +22,9 @@ myTumble.factory('MyBackend', [ '$http', function($http) {
     };
     MyBackend.updateUser = function(user) {
         return $http.put('/api/users/' + user.name, user);
+    };
+    MyBackend.loadLikers = function(likers) {
+        return $http.post('/api/status/loadlikers', likers);
     };
     return MyBackend;
 } ]);
@@ -42,6 +48,8 @@ myTumble.controller('Users', [
             $scope.loadUsers = function(filter) {
                 if (filter === $scope.userfilter)
                     return;
+                if (filter === 'special')
+                    return;
                 $scope.addLog('Loading users (' + filter + ')');
                 MyBackend.getUsers('?filter=' + filter).then(function(response) {
                     $scope.userfilter = filter;
@@ -49,6 +57,19 @@ myTumble.controller('Users', [
                     $scope.addLog('Loaded users');
                 }, function(error) {
                     $scope.addLog('Failed to load users (' + $scope.userFilter + '): ' + error.message);
+                });
+            };
+
+            $scope.processedUsers = function(filter) {
+                if (filter === $scope.userfilter)
+                    return;
+                $scope.addLog('Loading processed (' + filter + ')');
+                MyBackend.processedUsers('?filter=' + filter).then(function(response) {
+                    $scope.userfilter = filter;
+                    $scope.users = response.data;
+                    $scope.addLog('Loaded processed users');
+                }, function(error) {
+                    $scope.addLog('Failed to load processed users (' + $scope.userFilter + '): ' + error.message);
                 });
             };
 
@@ -95,6 +116,17 @@ myTumble.controller('Users', [
             $scope.refreshUsers = function() {
                 $scope.addLog('Refreshing the users database');
                 MyBackend.refreshUsers().then(function(response) {
+                }, function(error) {
+                    $scope.addLog('Failed to refresh users: ' + error.message);
+                });
+            };
+ 
+            $scope.loadLikers = function(likers) {
+                $scope.addLog('Load likers...');
+                MyBackend.loadLikers(likers).then(function(response) {
+                    $scope.userfilter = 'special';
+                    $scope.users = response.data;
+                    $scope.addLog('Loaded not followed likers');
                 }, function(error) {
                     $scope.addLog('Failed to refresh users: ' + error.message);
                 });

@@ -49,10 +49,17 @@
 							<label for="ifollow-{{auser.name}}">I follow</label>
 						</div></td>
 				</tr>
-				<tr>
-					<td colspan="2"><p class="oneline">{{auser.lastcheck |
-							date:'yyyy-MM-dd HH:mm'}}</p></td>
-				</tr>
+                <tr>
+                    <td colspan="2"><p class="oneline">{{auser.lastcheck |
+                            date:'yyyy-MM-dd HH:mm'}}</p></td>
+                </tr>
+                <tr>
+                    <td colspan="2"><p class="oneline">{{auser.latest |
+                            date:'yyyy-MM-dd HH:mm'}}</p></td>
+                </tr>
+                <tr>
+                    <td colspan="2"><p class="oneline">Total: {{auser.counts}}</p></td>
+                </tr>
 			</table>
 		</div>
 		</main>
@@ -74,8 +81,11 @@
 			<button ng-click="likeReverseUsers('ifollow')">Like reverse I follow</button>
 			<button ng-click="likeUsers('special')">Like specials</button>
             <button ng-click="refreshUsers()">Refresh users</button>
-			<button ng-click="loadUsers('notfollowsme,notifollow')">We
-				lost contact</button><br/>
+            <button ng-click="loadUsers('notfollowsme,notifollow')">We
+                lost contact</button><br/>
+            <button ng-click="processedUsers('lastReactions')">Unknown latest</button><br/>
+            <button ng-click="loadLikers(thelikers)">Load likers</button><br/>
+            <textarea ng-model="thelikers">Names here...</textarea>
 		</nav>
 		<aside class="HolyGrail-ads">
 			<div ng-repeat="message in messages">{{ message.timestamp |
@@ -88,5 +98,6 @@
 		src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.4/sockjs.js"></script>
 	<script type="text/javascript" src="/js/vertx-eventbus.js"></script>
 	<script type="text/javascript" src="/js/app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.0/dist/FileSaver.min.js"></script>
 </body>
 </html>

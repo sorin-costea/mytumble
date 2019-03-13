@@ -1,10 +1,15 @@
 package org.sorincos.mytumble;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import com.tumblr.jumblr.JumblrClient;
 import com.tumblr.jumblr.types.Blog;
+import com.tumblr.jumblr.types.Note;
 import com.tumblr.jumblr.types.Post;
 import com.tumblr.jumblr.types.User;
 
@@ -91,9 +97,43 @@ public class TumblrConnector extends AbstractVerticle {
         EventBus eb = vertx.eventBus();
         eb.<String>consumer("mytumble.tumblr.loadusers").handler(this::loadUsers);
         eb.<JsonArray>consumer("mytumble.tumblr.loaduserdetails").handler(this::loadUserDetails);
+        eb.<JsonArray>consumer("mytumble.tumblr.readuserlist").handler(this::readUserList);
         eb.<JsonObject>consumer("mytumble.tumblr.likelatest").handler(this::likeLatest);
+        eb.<JsonObject>consumer("mytumble.tumblr.lastpostsreacts").handler(this::lastPostsReacts);
         eb.<String>consumer("mytumble.tumblr.followblog").handler(this::followBlog);
         eb.<String>consumer("mytumble.tumblr.unfollowblog").handler(this::unfollowBlog);
+    }
+
+    private void lastPostsReacts(Message<JsonObject> msg) {
+        Integer howMany = Integer.valueOf(msg.body().getString("posts"));
+        try {
+            JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
+            if (client == null) {
+                msg.fail(1, "Error: Jumblr not initialized");
+                return;
+            }
+            Map<String, Object> params = new HashMap<String, Object>();
+            params.put("notes_info", "true");
+            List<Post> posts = client.blogPosts(blogname, params);
+            List<JsonObject> users = new ArrayList<>();
+            for (int i = 0; i < howMany; i++) {
+                Post post = posts.get(i);
+                List<Note> notes = post.getNotes();
+                users.addAll(notes.stream().map(note -> {
+                    JsonObject user = new JsonObject();
+                    user.put("name", note.getBlogName());
+                    user.put("avatarurl", client.blogAvatar(note.getBlogName()));
+                    return user;
+                }).collect(Collectors.toList()));
+            }
+            logger.info("For latest " + howMany + " posts got: " + users.size() + " users reacting");
+            JsonArray jsonUsers = new JsonArray();
+            users.forEach(user -> jsonUsers.add(user));
+            msg.reply(jsonUsers);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            msg.fail(1, "ERROR: Loading likers for latest " + howMany + ": " + ex.getLocalizedMessage());
+        }
     }
 
     private void likeLatest(Message<JsonObject> msg) {
@@ -184,8 +224,9 @@ public class TumblrConnector extends AbstractVerticle {
             }
             JsonArray jsonEmptyFollowers = new JsonArray();
             jsonFollowers.forEach(jsonFollower -> {
-                if (((JsonObject) jsonFollower).getString("avatarurl", "") == "")
+                if (((JsonObject) jsonFollower).getString("avatarurl", "") == "") {
                     jsonEmptyFollowers.add(jsonFollower);
+                }
             });
             loopLoadUserDetails(jsonEmptyFollowers, client);
         } catch (Exception ex) {
@@ -202,13 +243,25 @@ public class TumblrConnector extends AbstractVerticle {
             return;
         }
         vertx.setTimer(1000, t -> {
-            JsonObject jsonFollower = (JsonObject) jsonFollowers.getJsonObject(0);
+            JsonObject jsonFollower = jsonFollowers.getJsonObject(0);
             logger.info("Still " + jsonFollowers.size() + ", fetching: " + jsonFollower.getString("name"));
             try {
-                String avatar = client.blogAvatar(jsonFollower.getString("name") + ".tumblr.com");
-                jsonFollower.put("avatarurl", avatar);
+                Blog info = client.blogInfo(jsonFollower.getString("name"));
+                jsonFollower.put("avatarurl", info.avatar());
+                jsonFollower.put("counts", info.getPostCount());
+                SimpleDateFormat tumblrDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss 'GMT'");
+                OptionalLong latest = info.posts().stream().mapToLong(post -> {
+                    try {
+                        return tumblrDate.parse(post.getDateGMT()).getTime();
+                    } catch (ParseException e) {
+                        logger.error("Error parsing dateGMT for: " + jsonFollower.getString("name") + ": "
+                                + post.getDateGMT());
+                        return 0;
+                    }
+                }).max();
+                jsonFollower.put("latest", latest.orElse(0));
             } catch (Exception e) {
-                logger.warn("Getting avatar for " + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
+                logger.warn("Getting info for " + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
             }
             vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
             jsonFollowers.remove(0);
@@ -342,5 +395,62 @@ public class TumblrConnector extends AbstractVerticle {
         }
         vertx.eventBus().send("mytumble.web.status", "Done refreshing users");
         msg.reply("Done refreshing users");
+    }
+
+    private void readUserList(Message<JsonArray> msg) {
+        JsonArray jsonUsers = new JsonArray();
+        try {
+            JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
+            if (client == null) {
+                logger.error("Error: Jumblr not initialized");
+                return;
+            }
+            long now = new Date().getTime();
+            Iterator<Object> userIterator = msg.body().iterator();
+            vertx.setPeriodic(1000, id -> {
+                String user = (String) userIterator.next();
+                logger.info("---liker: " + user);
+                JsonObject jsonUser = new JsonObject();
+                jsonUser.put("_id", user);
+                jsonUser.put("name", user);
+                jsonUser.put("lastcheck", now); // who cares???
+                jsonUser.put("ifollow", false);
+                jsonUser.put("followsme", false);
+                jsonUser.put("liker", true);
+                try {
+                    Blog info = client.blogInfo(user);
+                    jsonUser.put("avatarurl", info.avatar());
+                    jsonUser.put("counts", info.getPostCount());
+                    SimpleDateFormat tumblrDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss 'GMT'");
+                    OptionalLong latest = info.posts().stream().mapToLong(post -> {
+                        try {
+                            return tumblrDate.parse(post.getDateGMT()).getTime();
+                        } catch (ParseException e) {
+                            logger.error("Error parsing dateGMT for: " + user + ": " + post.getDateGMT());
+                            return 0;
+                        }
+                    }).max();
+                    jsonUser.put("latest", latest.orElse(0));
+                    jsonUsers.add(jsonUser);
+                } catch (Exception e) {
+                    logger.error("Error loading info for: " + user + ": " + e.getLocalizedMessage());
+                }
+                if (!userIterator.hasNext()) {
+                    vertx.cancelTimer(id);
+                    logger.info("Finished that many likers: " + jsonUsers.size());
+                    vertx.eventBus().send("mytumble.web.status", "Finished likers: " + jsonUsers.size());
+                    List<Object> sortedUsers = jsonUsers.stream().sorted((o1, o2) -> ((JsonObject) o1).getString("name")
+                            .compareTo(((JsonObject) o2).getString("name"))).collect(Collectors.toList());
+                    JsonArray jsonSortedUsers = new JsonArray();
+                    sortedUsers.forEach(u -> jsonSortedUsers.add(u));
+                    msg.reply(jsonSortedUsers);
+                }
+            });
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            msg.fail(1, ex.getLocalizedMessage());
+            vertx.eventBus().send("mytumble.web.status", "Refresh failed: " + ex.getLocalizedMessage());
+            return;
+        }
     }
 }
