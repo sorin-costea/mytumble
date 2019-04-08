@@ -146,6 +146,7 @@ public class TumblrConnector extends AbstractVerticle {
             }
 
             Map<String, Object> params = new HashMap<String, Object>();
+            params.put("limit", "3");
             List<Post> posts = client.blogPosts(toLike, params);
             boolean liked = false;
             for (Post post : posts) { // no use to like reblogs or what already liked

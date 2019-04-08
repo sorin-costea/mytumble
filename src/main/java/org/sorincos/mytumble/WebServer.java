@@ -75,35 +75,26 @@ public class WebServer extends SyncVerticle {
         List<String> likersList = Arrays.asList(likersArray);
         logger.info("Loading the unknown likers: " + likersList.size());
 
-        vertx.eventBus().send("mytumble.mongo.getusers", "ifollow", options, result -> {
+        vertx.eventBus().send("mytumble.mongo.getusers", "", options, result -> {
             if (result.failed()) {
                 ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
                 return;
             }
             JsonArray known = (JsonArray) result.result().body();
-            vertx.eventBus().send("mytumble.mongo.getusers", "weird", options, result2 -> {
-                if (result2.failed()) {
-                    ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
-                    return;
-                }
-                known.addAll((JsonArray) result2.result().body());
-                logger.info("Known: " + known.toString());
+            Set<String> unknowns = likersList.stream().filter(liker -> !contains(known, liker))
+                    .collect(Collectors.toSet());
+            logger.info("New likers found: " + unknowns.size());
 
-                Set<String> unknowns = likersList.stream().filter(liker -> !contains(known, liker))
-                        .collect(Collectors.toSet());
-                logger.info("New likers found: " + unknowns);
-
-                JsonArray unknownsArray = new JsonArray();
-                unknowns.forEach(liker -> {
-                    unknownsArray.add(liker);
-                });
-                // now read their infos
-                vertx.eventBus().send("mytumble.tumblr.readuserlist", unknownsArray, options, done -> {
-                    logger.info("New likers loaded: " + ((JsonArray) done.result().body()).size());
-                    ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-                    ctx.response().end(((JsonArray) done.result().body()).encode());
-                    return;
-                });
+            JsonArray unknownsArray = new JsonArray();
+            unknowns.forEach(liker -> {
+                unknownsArray.add(liker);
+            });
+            // now read their infos
+            vertx.eventBus().send("mytumble.tumblr.readuserlist", unknownsArray, options, done -> {
+                logger.info("New likers loaded: " + ((JsonArray) done.result().body()).size());
+                ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+                ctx.response().end(((JsonArray) done.result().body()).encode());
+                return;
             });
         });
 
@@ -339,21 +330,21 @@ public class WebServer extends SyncVerticle {
         try {
             vertx.eventBus().send("mytumble.mongo.getuser", new JsonArray().add(toUpdate), resultGet -> {
                 if (((JsonArray) resultGet.result().body()).isEmpty()) {
-                    if (jsonUsers.getJsonObject(0).getBoolean("ifollow")) {
-                        vertx.eventBus().send("mytumble.tumblr.followblog", toUpdate, u -> {
-                            vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, h -> {
-                                if (h.failed()) {
-                                    logger.info("Failed when updating " + toUpdate + ": "
-                                            + h.cause().getLocalizedMessage());
-                                    vertx.eventBus().send("mytumble.web.status", "Failed when updating " + toUpdate
-                                            + ": " + h.cause().getLocalizedMessage());
-                                } else {
-                                    vertx.eventBus().send("mytumble.web.status", "Updated user " + toUpdate);
-                                }
-                            });
-                        });
-                        return;
-                    }
+                    vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, h -> {
+                        if (h.failed()) {
+                            logger.info("Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
+                            vertx.eventBus().send("mytumble.web.status",
+                                    "Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
+                        } else {
+                            if (jsonUsers.getJsonObject(0).getBoolean("ifollow")) {
+                                vertx.eventBus().send("mytumble.tumblr.followblog", toUpdate, u -> {
+                                    vertx.eventBus().send("mytumble.web.status", "Followed user " + toUpdate);
+                                });
+                                return;
+                            }
+                            vertx.eventBus().send("mytumble.web.status", "Updated user " + toUpdate);
+                        }
+                    });
                 }
                 JsonArray userFetched = (JsonArray) resultGet.result().body();
                 Boolean iFollow = userFetched.getJsonObject(0).getBoolean("ifollow");
