@@ -16,9 +16,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.impl.ContextImpl;
 import io.vertx.core.impl.VertxImpl;
 import io.vertx.core.json.JsonObject;
 
@@ -35,7 +35,7 @@ public class MongoConnectorTests {
     private VertxImpl vertx;
 
     @Mock
-    private ContextImpl context;
+    private Context context;
 
     @Mock
     private EventBus eventBus;
@@ -66,8 +66,9 @@ public class MongoConnectorTests {
 
     @After
     public void tearDown() throws Exception {
-        if (mongoConnVerticle != null)
+        if (mongoConnVerticle != null) {
             mongoConnVerticle.stop();
+        }
     }
 
     @Test
