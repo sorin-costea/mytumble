@@ -282,7 +282,7 @@ public class TumblrConnector extends AbstractVerticle {
             options.put("offset", Integer.toString(offset));
             List<Blog> blogs = new ArrayList<>();
             try {
-                blogs = client.userFollowing(options);
+                blogs = client.userFollowing(options); // blogs I follow
             } catch (Exception e) {
                 logger.info("Error loading blogs I follow: " + e.getLocalizedMessage());
                 try {
@@ -306,11 +306,11 @@ public class TumblrConnector extends AbstractVerticle {
                 mapUsers.put(blog.getName(), jsonIfollow);
                 logger.info("ifollow: " + mapUsers.size() + "/" + blog.getName());
             }
-            if (blogs.isEmpty()) {
+            if (blogs.isEmpty()) { // done with the blogs I follow, time to list my followers
                 Blog myBlog = null;
                 for (Blog blog : client.user().getBlogs()) {
                     if (blog.getName().compareTo(blogname) == 0) {
-                        myBlog = blog;
+                        myBlog = blog; // get the main blog
                         break;
                     }
                 }
@@ -321,10 +321,10 @@ public class TumblrConnector extends AbstractVerticle {
                 int numFollowers = myBlog.getFollowersCount();
                 logger.info("Following (theoretically): " + mapUsers.size());
                 logger.info("Followers (theoretically): " + numFollowers);
-                loopLoadFollowers(mapUsers, 0, myBlog);
+                loopLoadFollowers(mapUsers, 0, myBlog); // get the followers in the map
                 return;
             }
-            loopLoadUsers(mapUsers, offset + 10);
+            loopLoadUsers(mapUsers, offset + 10); // next 10 (small batches)
         });
         return 0;
     }
@@ -343,7 +343,7 @@ public class TumblrConnector extends AbstractVerticle {
                     followers = myBlog.followers(options);
                     logger.info("Last chance gave: " + followers.size());
                 }
-                if (followers.isEmpty()) {
+                if (followers.isEmpty()) { // done loading the followers (following are loaded already)
                     JsonArray jsonUsers = new JsonArray();
                     mapUsers.forEach((k, v) -> jsonUsers.add(v));
                     logger.info("Total users: " + jsonUsers.size());

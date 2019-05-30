@@ -345,28 +345,30 @@ public class WebServer extends SyncVerticle {
                             vertx.eventBus().send("mytumble.web.status", "Updated user " + toUpdate);
                         }
                     });
-                }
-                JsonArray userFetched = (JsonArray) resultGet.result().body();
-                Boolean iFollow = userFetched.getJsonObject(0).getBoolean("ifollow");
-                JsonObject userNew = jsonUsers.getJsonObject(0);
-                Boolean shouldFollow = userNew.getBoolean("ifollow");
-                if ((iFollow == null || !iFollow) && (shouldFollow != null && shouldFollow)) { // wasnt following
-                    vertx.eventBus().send("mytumble.tumblr.followblog", toUpdate, h -> {
-                    });
-                }
-                if ((iFollow != null && iFollow) && (shouldFollow != null && !shouldFollow)) { // previously following
-                    vertx.eventBus().send("mytumble.tumblr.unfollowblog", toUpdate, h -> {
-                    });
-                }
-                vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, h -> {
-                    if (h.failed()) {
-                        logger.info("Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
-                        vertx.eventBus().send("mytumble.web.status",
-                                "Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
-                    } else {
-                        vertx.eventBus().send("mytumble.web.status", "Updated user " + toUpdate);
+                } else {
+                    JsonArray userFetched = (JsonArray) resultGet.result().body();
+                    Boolean iFollow = userFetched.getJsonObject(0).getBoolean("ifollow");
+                    JsonObject userNew = jsonUsers.getJsonObject(0);
+                    Boolean shouldFollow = userNew.getBoolean("ifollow");
+                    if ((iFollow == null || !iFollow) && (shouldFollow != null && shouldFollow)) { // wasnt following
+                        vertx.eventBus().send("mytumble.tumblr.followblog", toUpdate, h -> {
+                        });
                     }
-                });
+                    if ((iFollow != null && iFollow) && (shouldFollow != null && !shouldFollow)) { // previously
+                                                                                                   // following
+                        vertx.eventBus().send("mytumble.tumblr.unfollowblog", toUpdate, h -> {
+                        });
+                    }
+                    vertx.eventBus().send("mytumble.mongo.saveusers", jsonUsers, h -> {
+                        if (h.failed()) {
+                            logger.info("Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
+                            vertx.eventBus().send("mytumble.web.status",
+                                    "Failed when updating " + toUpdate + ": " + h.cause().getLocalizedMessage());
+                        } else {
+                            vertx.eventBus().send("mytumble.web.status", "Updated user " + toUpdate);
+                        }
+                    });
+                }
             });
             ctx.response().setStatusCode(200).end();
         } catch (Exception ex) {
