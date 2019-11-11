@@ -102,6 +102,7 @@ public class TumblrConnector extends AbstractVerticle {
         eb.<JsonObject>consumer("mytumble.tumblr.lastpostsreacts").handler(this::lastPostsReacts);
         eb.<String>consumer("mytumble.tumblr.followblog").handler(this::followBlog);
         eb.<String>consumer("mytumble.tumblr.unfollowblog").handler(this::unfollowBlog);
+        eb.<String>consumer("mytumble.tumblr.getconfigblog").handler(this::getConfigblog);
     }
 
     private void lastPostsReacts(Message<JsonObject> msg) {
@@ -152,7 +153,7 @@ public class TumblrConnector extends AbstractVerticle {
             for (Post post : posts) { // no use to like reblogs or what already liked
                 if ((post.getSourceUrl() == null || post.getSourceUrl() == "") && !post.isLiked()) {
                     client.like(post.getId(), post.getReblogKey());
-                    logger.info("Original for " + toLike + ": " + post.getShortUrl() + "/" + post.getSourceTitle());
+                    logger.info("Original for " + toLike + ": " + post.getPostUrl() + "/" + post.getSourceTitle());
                     liked = true;
                     break;
                 }
@@ -210,6 +211,11 @@ public class TumblrConnector extends AbstractVerticle {
         }
     }
 
+    private void getConfigblog(Message<String> msg) {
+        logger.info("Get config");
+        msg.reply(getBlogname());
+    }
+
     private void loadUserDetails(Message<JsonArray> msg) {
         try {
             vertx.eventBus().send("mytumble.web.status", "deeetails");
@@ -223,6 +229,7 @@ public class TumblrConnector extends AbstractVerticle {
                 msg.fail(1, "Error: Jumblr not initialized");
                 return;
             }
+            // FIXME all have avatar null???
             JsonArray jsonEmptyFollowers = new JsonArray();
             jsonFollowers.forEach(jsonFollower -> {
                 if (((JsonObject) jsonFollower).getString("avatarurl", "") == "") {
@@ -408,6 +415,11 @@ public class TumblrConnector extends AbstractVerticle {
             }
             long now = new Date().getTime();
             Iterator<Object> userIterator = msg.body().iterator();
+            if (!userIterator.hasNext()) {
+                logger.info("No users found");
+                vertx.eventBus().send("mytumble.web.status", "No users found");
+                return;
+            }
             vertx.setPeriodic(1000, id -> {
                 String user = (String) userIterator.next();
                 logger.info("---liker: " + user);

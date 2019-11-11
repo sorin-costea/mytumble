@@ -35,6 +35,7 @@ public class WebServer extends SyncVerticle {
 
     static final Logger logger = LoggerFactory.getLogger(WebServer.class);
     private final DeliveryOptions options = new DeliveryOptions().setSendTimeout(15 * 60 * 1000);
+    private String blogname = "";
 
     @Override
     public void start() throws Exception {
@@ -66,6 +67,11 @@ public class WebServer extends SyncVerticle {
         router.route().handler(StaticHandler.create());
 
         vertx.createHttpServer().requestHandler(router::accept).listen(8080);
+        vertx.eventBus().send("mytumble.tumblr.getconfigblog", "", options, done -> {
+            blogname = done.result().body().toString();
+            return;
+        });
+
     }
 
     @Suspendable
@@ -73,7 +79,7 @@ public class WebServer extends SyncVerticle {
         String likers = ctx.getBodyAsString();
         String[] likersArray = likers.split("\n");
         List<String> likersList = Arrays.asList(likersArray);
-        logger.info("Loading the unknown likers: " + likersList.size());
+        logger.info("Loading the unknown likers: " + likersList.size() + " for " + blogname);
 
         vertx.eventBus().send("mytumble.mongo.getusers", "", options, result -> {
             if (result.failed()) {
@@ -105,7 +111,7 @@ public class WebServer extends SyncVerticle {
     }
 
     private void unfollowAsocials(RoutingContext ctx) {
-        logger.info("Unfollowing those who don't follow back");
+        logger.info("Unfollowing those who don't follow back for: " + blogname);
 
         try {
             vertx.eventBus().send("mytumble.mongo.getusers", "notspecial,notfollowsme,ifollow", options, result -> {
@@ -126,7 +132,7 @@ public class WebServer extends SyncVerticle {
     }
 
     private void followFolks(RoutingContext ctx) {
-        logger.info("Following back not weird followers");
+        logger.info("Following back not weird followers for: " + blogname);
 
         try {
             vertx.eventBus().send("mytumble.mongo.getusers", "followsme,notweird,notifollow", options, result -> {
@@ -180,6 +186,7 @@ public class WebServer extends SyncVerticle {
     private void likeUsers(RoutingContext ctx) {
         String filter = ctx.request().getParam("filter");
         String reverse = ctx.request().getParam("reverse");
+        logger.info("Like (" + reverse + ")" + " users for: " + blogname);
         try {
             vertx.eventBus().send("mytumble.mongo.getusers", filter, options, result -> {
                 logger.info("Liking " + filter + ": " + ((JsonArray) result.result().body()).size());
@@ -217,7 +224,7 @@ public class WebServer extends SyncVerticle {
 
     private void getUsers(RoutingContext ctx) {
         String filter = ctx.request().getParam("filter");
-        logger.info("Get " + ((filter.length() == 0) ? "" : filter) + " users");
+        logger.info("Get " + ((filter.length() == 0) ? "" : filter) + " users for: " + blogname);
 
         vertx.eventBus().send("mytumble.mongo.getusers", filter, options, result -> {
             if (result.failed()) {
@@ -281,7 +288,7 @@ public class WebServer extends SyncVerticle {
 
     @Suspendable
     private void refreshUsers(RoutingContext ctx) {
-        logger.info("Refresh followers");
+        logger.info("Refresh followers for: " + blogname);
 
         try {
             vertx.eventBus().send("mytumble.mongo.resetusers", null, resetted -> {
