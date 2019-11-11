@@ -21,7 +21,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
-        <vertx.version>3.5.0</vertx.version>
+        <vertx.version>3.8.3</vertx.version>
         <jumblr.version>75e634d</jumblr.version>
     </properties>
 
