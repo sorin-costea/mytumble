@@ -153,7 +153,7 @@ public class TumblrConnector extends AbstractVerticle {
             for (Post post : posts) { // no use to like reblogs or what already liked
                 if ((post.getSourceUrl() == null || post.getSourceUrl() == "") && !post.isLiked()) {
                     client.like(post.getId(), post.getReblogKey());
-                    logger.info("Original for " + toLike + ": " + post.getPostUrl() + "/" + post.getSourceTitle());
+                    logger.info("Original for " + toLike + ": " + post.getPostUrl());
                     liked = true;
                     break;
                 }
@@ -163,7 +163,7 @@ public class TumblrConnector extends AbstractVerticle {
                     if (!post.isLiked() && post.getSourceUrl() != null && post.getSourceUrl() != ""
                             && post.getSourceTitle().compareToIgnoreCase(blogname) != 0) {
                         client.like(post.getId(), post.getReblogKey());
-                        logger.info("Liked for " + toLike + ": " + post.getShortUrl() + "/" + post.getSourceTitle());
+                        logger.info("Liked for " + toLike + ": " + post.getPostUrl());
                         liked = true;
                         break;
                     }
@@ -172,6 +172,7 @@ public class TumblrConnector extends AbstractVerticle {
                     logger.info("Nothing to like among latest " + posts.size() + ": " + toLike);
                 }
             }
+            // TODO if not liked: send mongo increment blanks, else: send mongo reset blanks
         } catch (Exception ex) {
             msg.fail(1, "ERROR: Liking latest for " + toLike + ": " + ex.getLocalizedMessage());
         }
@@ -444,7 +445,9 @@ public class TumblrConnector extends AbstractVerticle {
                         }
                     }).max();
                     jsonUser.put("latest", latest.orElse(0));
-                    jsonUsers.add(jsonUser);
+                    if (!info.avatar().contains("default_avatar")) {
+                        jsonUsers.add(jsonUser);
+                    }
                 } catch (Exception e) {
                     logger.error("Error loading info for: " + user + ": " + e.getLocalizedMessage());
                 }
