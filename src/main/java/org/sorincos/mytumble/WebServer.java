@@ -2,6 +2,9 @@ package org.sorincos.mytumble;
 
 import static io.vertx.ext.sync.Sync.fiberHandler;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -52,6 +55,7 @@ public class WebServer extends SyncVerticle {
         router.put("/api/status/refreshusers").handler(fiberHandler(this::refreshUsers));
         router.put("/api/status/likeusers").handler(fiberHandler(this::likeUsers));
         router.put("/api/status/unfollowasocials").handler(fiberHandler(this::unfollowAsocials));
+        router.put("/api/status/unfollowdead").handler(fiberHandler(this::unfollowDead));
         router.put("/api/status/followfolks").handler(fiberHandler(this::followFolks));
 
         // modifying stuff
@@ -63,6 +67,8 @@ public class WebServer extends SyncVerticle {
         // getting processed data
         router.get("/api/processedusers").handler(this::processedUsers);
         router.post("/api/status/loadlikers").handler(this::loadLikers);
+        router.get("/api/status/getdead").handler(this::getDead);
+        router.post("/api/status/showdead").handler(this::showDead);
 
         router.route().handler(StaticHandler.create());
 
@@ -72,6 +78,104 @@ public class WebServer extends SyncVerticle {
             return;
         });
 
+    }
+
+    @Suspendable
+    private void unfollowDead(RoutingContext ctx) {
+        logger.info("Unfollowing the inactive likers for " + blogname);
+
+        try {
+            // ifollow and last > 3 months
+            vertx.eventBus().send("mytumble.mongo.getusers", "notspecial,ifollow", options, result -> {
+                if (result.failed()) {
+                    ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+                    return;
+                }
+                JsonArray allKnown = (JsonArray) result.result().body();
+                final ArrayList<Object> allDead = new ArrayList<>();
+
+                LocalDate last3Months = LocalDate.now().minusMonths(3);
+                allKnown.forEach(known -> {
+                    try {
+                        LocalDate latestDate = Instant.ofEpochMilli(((JsonObject) known).getLong("latest"))
+                                .atZone(ZoneId.systemDefault()).toLocalDate();
+                        if (latestDate.compareTo(last3Months) < 0) {
+                            allDead.add(known);
+                        }
+                    } catch (Exception e) {
+                        logger.info("No latest found for: " + ((JsonObject) known).getString("name"));
+                        allDead.add(known);
+                    }
+                });
+                loopUnfollow(allDead);
+                vertx.eventBus().send("mytumble.web.status", "Unfollowed dead");
+            });
+            ctx.response().setStatusCode(200).end();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            if (ctx.response().ended()) {
+                vertx.eventBus().send("mytumble.web.status", "Unfollowing dead failed: " + ex.getLocalizedMessage());
+            } else {
+                ctx.response().setStatusCode(500).setStatusMessage(ex.getLocalizedMessage()).end();
+            }
+        }
+    }
+
+    @Suspendable
+    private void showDead(RoutingContext ctx) {
+        String names = ctx.getBodyAsString();
+        List<String> namesList = Arrays.asList(names.split("\n"));
+        logger.info("Loading the inactive likers: " + namesList.size() + " for " + blogname);
+
+        vertx.eventBus().send("mytumble.mongo.getusers", "", options, result -> {
+            if (result.failed()) {
+                ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+                return;
+            }
+            JsonArray allKnown = (JsonArray) result.result().body();
+            final JsonArray allDead = new JsonArray();
+            allKnown.forEach(known -> {
+                if (namesList.contains(((JsonObject) known).getString("name"))
+                        && ((JsonObject) known).getBoolean("ifollow")) {
+                    allDead.add(known);
+                }
+            });
+            ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+            ctx.response().end(allDead.encode());
+            return;
+        });
+    }
+
+    @Suspendable
+    private void getDead(RoutingContext ctx) {
+        logger.info("Loading the inactive likers for " + blogname);
+
+        // ifollow and last > 3 months
+        vertx.eventBus().send("mytumble.mongo.getusers", "notspecial,ifollow", options, result -> {
+            if (result.failed()) {
+                ctx.response().setStatusCode(500).setStatusMessage(result.cause().getLocalizedMessage()).end();
+                return;
+            }
+            JsonArray allKnown = (JsonArray) result.result().body();
+            final JsonArray allDead = new JsonArray();
+
+            LocalDate last3Months = LocalDate.now().minusMonths(3);
+            allKnown.forEach(known -> {
+                try {
+                    LocalDate latestDate = Instant.ofEpochMilli(((JsonObject) known).getLong("latest"))
+                            .atZone(ZoneId.systemDefault()).toLocalDate();
+                    if (latestDate.compareTo(last3Months) < 0) {
+                        allDead.add(known);
+                    }
+                } catch (Exception e) {
+                    logger.info("No latest found for: " + ((JsonObject) known).getString("name"));
+                    allDead.add(known);
+                }
+            });
+            ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+            ctx.response().end(allDead.encode());
+            return;
+        });
     }
 
     @Suspendable
@@ -96,7 +200,7 @@ public class WebServer extends SyncVerticle {
                 unknownsArray.add(liker);
             });
             // now read their infos
-            vertx.eventBus().send("mytumble.tumblr.readuserlist", unknownsArray, options, done -> {
+            vertx.eventBus().send("mytumble.tumblr.fetchnewusers", unknownsArray, options, done -> {
                 logger.info("New likers loaded: " + ((JsonArray) done.result().body()).size());
                 ctx.response().putHeader(HttpHeaders.CONTENT_TYPE, "application/json");
                 ctx.response().end(((JsonArray) done.result().body()).encode());
@@ -116,7 +220,7 @@ public class WebServer extends SyncVerticle {
         try {
             vertx.eventBus().send("mytumble.mongo.getusers", "notspecial,notfollowsme,ifollow", options, result -> {
                 ArrayList<Object> notFollowers = Lists.newArrayList((JsonArray) result.result().body());
-                loopUnfollowAsocial(notFollowers);
+                loopUnfollow(notFollowers);
                 vertx.eventBus().send("mytumble.web.status", "Unfollowed asocials");
             });
             ctx.response().setStatusCode(200).end();
@@ -167,7 +271,7 @@ public class WebServer extends SyncVerticle {
         });
     }
 
-    private void loopUnfollowAsocial(ArrayList<Object> notFollowers) {
+    private void loopUnfollow(ArrayList<Object> notFollowers) {
         if (notFollowers.size() == 0) {
             return;
         }
@@ -177,7 +281,7 @@ public class WebServer extends SyncVerticle {
                 notFollower.put("ifollow", false);
                 vertx.eventBus().send("mytumble.mongo.saveuser", notFollower, save -> {
                     notFollowers.remove(0);
-                    loopUnfollowAsocial(notFollowers);
+                    loopUnfollow(notFollowers);
                 });
             });
         });

@@ -96,8 +96,8 @@ public class TumblrConnector extends AbstractVerticle {
 
         EventBus eb = vertx.eventBus();
         eb.<String>consumer("mytumble.tumblr.loadusers").handler(this::loadUsers);
-        eb.<JsonArray>consumer("mytumble.tumblr.loaduserdetails").handler(this::loadUserDetails);
-        eb.<JsonArray>consumer("mytumble.tumblr.readuserlist").handler(this::readUserList);
+        // eb.<JsonArray>consumer("mytumble.tumblr.loaduserdetails").handler(this::loadUserDetails);
+        eb.<JsonArray>consumer("mytumble.tumblr.fetchnewusers").handler(this::fetchNewUsers);
         eb.<JsonObject>consumer("mytumble.tumblr.likelatest").handler(this::likeLatest);
         eb.<JsonObject>consumer("mytumble.tumblr.lastpostsreacts").handler(this::lastPostsReacts);
         eb.<String>consumer("mytumble.tumblr.followblog").handler(this::followBlog);
@@ -217,68 +217,68 @@ public class TumblrConnector extends AbstractVerticle {
         msg.reply(getBlogname());
     }
 
-    private void loadUserDetails(Message<JsonArray> msg) {
-        try {
-            vertx.eventBus().send("mytumble.web.status", "deeetails");
-            JsonArray jsonFollowers = msg.body();
-            if (jsonFollowers.isEmpty()) {
-                msg.fail(1, "No details to load");
-                return;
-            }
-            JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
-            if (client == null) {
-                msg.fail(1, "Error: Jumblr not initialized");
-                return;
-            }
-            // FIXME all have avatar null???
-            JsonArray jsonEmptyFollowers = new JsonArray();
-            jsonFollowers.forEach(jsonFollower -> {
-                if (((JsonObject) jsonFollower).getString("avatarurl", "") == "") {
-                    jsonEmptyFollowers.add(jsonFollower);
-                }
-            });
-            loopLoadUserDetails(jsonEmptyFollowers, client);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            vertx.eventBus().send("mytumble.web.status", "Fetching details failed: " + ex.getLocalizedMessage());
-            msg.fail(1, ex.getLocalizedMessage());
-        }
-    }
+    // private void loadUserDetails(Message<JsonArray> msg) {
+    // try {
+    // vertx.eventBus().send("mytumble.web.status", "deeetails");
+    // JsonArray jsonFollowers = msg.body();
+    // if (jsonFollowers.isEmpty()) {
+    // msg.fail(1, "No details to load");
+    // return;
+    // }
+    // JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
+    // if (client == null) {
+    // msg.fail(1, "Error: Jumblr not initialized");
+    // return;
+    // }
+    // // FIXME all have avatar null???
+    // JsonArray jsonEmptyFollowers = new JsonArray();
+    // jsonFollowers.forEach(jsonFollower -> {
+    // if (((JsonObject) jsonFollower).getString("avatarurl", "") == "") {
+    // jsonEmptyFollowers.add(jsonFollower);
+    // }
+    // });
+    // loopUserDetails(jsonEmptyFollowers, client);
+    // } catch (Exception ex) {
+    // ex.printStackTrace();
+    // vertx.eventBus().send("mytumble.web.status", "Fetching details failed: " + ex.getLocalizedMessage());
+    // msg.fail(1, ex.getLocalizedMessage());
+    // }
+    // }
+    //
+    // private void loopUserDetails(JsonArray jsonFollowers, JumblrClient client) {
+    // if (jsonFollowers.size() == 0) {
+    // logger.info("Done loading details.");
+    // vertx.eventBus().send("mytumble.web.status", "Fetched details from Tumblr");
+    // return;
+    // }
+    // vertx.setTimer(1000, t -> {
+    // JsonObject jsonFollower = jsonFollowers.getJsonObject(0);
+    // logger.info("Still " + jsonFollowers.size() + ", fetching: " + jsonFollower.getString("name"));
+    // try {
+    // Blog info = client.blogInfo(jsonFollower.getString("name"));
+    // jsonFollower.put("avatarurl", info.avatar());
+    // jsonFollower.put("counts", info.getPostCount());
+    // SimpleDateFormat tumblrDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss 'GMT'");
+    // OptionalLong latest = info.posts().stream().mapToLong(post -> {
+    // try {
+    // return tumblrDate.parse(post.getDateGMT()).getTime();
+    // } catch (ParseException e) {
+    // logger.error("Error parsing dateGMT for: " + jsonFollower.getString("name") + ": "
+    // + post.getDateGMT());
+    // return 0;
+    // }
+    // }).max();
+    // jsonFollower.put("latest", latest.orElse(0));
+    // } catch (Exception e) {
+    // logger.warn("Getting info for " + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
+    // }
+    // vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
+    // jsonFollowers.remove(0);
+    // loopUserDetails(jsonFollowers, client);
+    // });
+    // }
 
-    private void loopLoadUserDetails(JsonArray jsonFollowers, JumblrClient client) {
-        if (jsonFollowers.size() == 0) {
-            logger.info("Done loading details.");
-            vertx.eventBus().send("mytumble.web.status", "Fetched details from Tumblr");
-            return;
-        }
-        vertx.setTimer(1000, t -> {
-            JsonObject jsonFollower = jsonFollowers.getJsonObject(0);
-            logger.info("Still " + jsonFollowers.size() + ", fetching: " + jsonFollower.getString("name"));
-            try {
-                Blog info = client.blogInfo(jsonFollower.getString("name"));
-                jsonFollower.put("avatarurl", info.avatar());
-                jsonFollower.put("counts", info.getPostCount());
-                SimpleDateFormat tumblrDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss 'GMT'");
-                OptionalLong latest = info.posts().stream().mapToLong(post -> {
-                    try {
-                        return tumblrDate.parse(post.getDateGMT()).getTime();
-                    } catch (ParseException e) {
-                        logger.error("Error parsing dateGMT for: " + jsonFollower.getString("name") + ": "
-                                + post.getDateGMT());
-                        return 0;
-                    }
-                }).max();
-                jsonFollower.put("latest", latest.orElse(0));
-            } catch (Exception e) {
-                logger.warn("Getting info for " + jsonFollower.getString("name") + ": " + e.getLocalizedMessage());
-            }
-            vertx.eventBus().send("mytumble.mongo.saveuser", jsonFollower);
-            jsonFollowers.remove(0);
-            loopLoadUserDetails(jsonFollowers, client);
-        });
-    }
-
-    private int loopLoadUsers(Map<String, JsonObject> mapUsers, int offset) {
+    private int loopUsers(Map<String, JsonObject> mapUsers, int offset) {
         JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
         if (client == null) {
             logger.error("Error: Jumblr not initialized");
@@ -329,15 +329,15 @@ public class TumblrConnector extends AbstractVerticle {
                 int numFollowers = myBlog.getFollowersCount();
                 logger.info("Following (theoretically): " + mapUsers.size());
                 logger.info("Followers (theoretically): " + numFollowers);
-                loopLoadFollowers(mapUsers, 0, myBlog); // get the followers in the map
+                loopFollowers(mapUsers, 0, myBlog); // get the followers in the map
                 return;
             }
-            loopLoadUsers(mapUsers, offset + 10); // next 10 (small batches)
+            loopUsers(mapUsers, offset + 10); // next 10 (small batches)
         });
         return 0;
     }
 
-    private void loopLoadFollowers(Map<String, JsonObject> mapUsers, int offset, Blog myBlog) {
+    private void loopFollowers(Map<String, JsonObject> mapUsers, int offset, Blog myBlog) {
         logger.info("---loop load: " + offset);
         Map<String, String> options = new HashMap<String, String>();
         long now = new Date().getTime();
@@ -387,7 +387,7 @@ public class TumblrConnector extends AbstractVerticle {
                 }
             }
             logger.info("---loop loaded: " + offset);
-            loopLoadFollowers(mapUsers, offset + followers.size(), myBlog);
+            loopFollowers(mapUsers, offset + followers.size(), myBlog);
         });
     }
 
@@ -395,7 +395,7 @@ public class TumblrConnector extends AbstractVerticle {
         try {
             vertx.eventBus().send("mytumble.web.status", "loaaaaadin");
             Map<String, JsonObject> mapUsers = new HashMap<>();
-            loopLoadUsers(mapUsers, 0);
+            loopUsers(mapUsers, 0);
         } catch (Exception ex) {
             ex.printStackTrace();
             msg.fail(1, ex.getLocalizedMessage());
@@ -406,7 +406,7 @@ public class TumblrConnector extends AbstractVerticle {
         msg.reply("Done refreshing users");
     }
 
-    private void readUserList(Message<JsonArray> msg) {
+    private void fetchNewUsers(Message<JsonArray> msg) {
         JsonArray jsonUsers = new JsonArray();
         try {
             JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
@@ -436,8 +436,10 @@ public class TumblrConnector extends AbstractVerticle {
                     jsonUser.put("avatarurl", info.avatar());
                     jsonUser.put("counts", info.getPostCount());
                     SimpleDateFormat tumblrDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss 'GMT'");
-                    OptionalLong latest = info.posts().stream().mapToLong(post -> {
+                    OptionalLong latest = info.posts().stream().mapToLong(post -> { // TODO gets the oldest??? undefined
                         try {
+                            // logger.error("---Parsing dateGMT for: " + user + ": "
+                            // + tumblrDate.parse(post.getDateGMT()).getTime());
                             return tumblrDate.parse(post.getDateGMT()).getTime();
                         } catch (ParseException e) {
                             logger.error("Error parsing dateGMT for: " + user + ": " + post.getDateGMT());

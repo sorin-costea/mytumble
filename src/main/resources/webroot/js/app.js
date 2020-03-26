@@ -26,6 +26,15 @@ myTumble.factory('MyBackend', [ '$http', function($http) {
     MyBackend.loadLikers = function(likers) {
         return $http.post('/api/status/loadlikers', likers);
     };
+    MyBackend.getDead = function(names) {
+        return $http.get('/api/status/getdead');
+    };
+    MyBackend.unfollowDead = function(names) {
+        return $http.put('/api/status/unfollowdead');
+    };
+    MyBackend.showDead = function(names) {
+        return $http.post('/api/status/showdead', names);
+    };
     return MyBackend;
 } ]);
 
@@ -84,6 +93,7 @@ myTumble.controller('Users', [
             $scope.likeUsers = function(filter) {
                 $scope.addLog('Liking users (' + filter + ')');
                 MyBackend.likeUsers('?filter=' + filter).then(function(response) {
+                    $scope.addLog('Liked users');
                 }, function(error) {
                     $scope.addLog('Failed to like users (' + filter + '): ' + error.message);
                 });
@@ -92,6 +102,7 @@ myTumble.controller('Users', [
             $scope.likeReverseUsers = function(filter) {
                 $scope.addLog('Liking reverse users (' + filter + ')');
                 MyBackend.likeUsers('?filter=' + filter + '&reverse=true').then(function(response) {
+                    $scope.addLog('Liked reverse users');
                 }, function(error) {
                     $scope.addLog('Failed to reverse like users (' + filter + '): ' + error.message);
                 });
@@ -100,6 +111,7 @@ myTumble.controller('Users', [
             $scope.unfollowAsocials = function() {
                 $scope.addLog('Unfollowing those who don\'t follow back');
                 MyBackend.unfollowAsocials().then(function(response) {
+                    $scope.addLog('Unfollowed users');
                 }, function(error) {
                     $scope.addLog('Failed to unfollow users: ' + error.message);
                 });
@@ -108,6 +120,7 @@ myTumble.controller('Users', [
             $scope.followFolks = function() {
                 $scope.addLog('Following not weird followers');
                 MyBackend.followFolks().then(function(response) {
+                    $scope.addLog('Followed users');
                 }, function(error) {
                     $scope.addLog('Failed to follow users: ' + error.message);
                 });
@@ -116,6 +129,7 @@ myTumble.controller('Users', [
             $scope.refreshUsers = function() {
                 $scope.addLog('Refreshing the users database');
                 MyBackend.refreshUsers().then(function(response) {
+                    $scope.addLog('Refreshed users');
                 }, function(error) {
                     $scope.addLog('Failed to refresh users: ' + error.message);
                 });
@@ -129,6 +143,37 @@ myTumble.controller('Users', [
                     $scope.addLog('Loaded not followed likers');
                 }, function(error) {
                     $scope.addLog('Failed to refresh users: ' + error.message);
+                });
+            };
+
+            $scope.getDead = function(names) {
+                $scope.addLog('Showing the dead...');
+                MyBackend.getDead().then(function(response) {
+                    $scope.userfilter = 'special';
+                    $scope.users = response.data;
+                    $scope.addLog('Loaded inactive users');
+                }, function(error) {
+                    $scope.addLog('Failed to show users: ' + error.message);
+                });
+            };
+
+            $scope.unfollowDead = function(names) {
+                $scope.addLog('Unfollowing the dead...');
+                MyBackend.unfollowDead().then(function(response) {
+                    $scope.addLog('Unfollowed inactive users');
+                }, function(error) {
+                    $scope.addLog('Failed to unfollow users: ' + error.message);
+                });
+            };
+
+            $scope.showDead = function(names) {
+                $scope.addLog('Show dead...');
+                MyBackend.showDead(names).then(function(response) {
+                    $scope.userfilter = 'special';
+                    $scope.users = response.data;
+                    $scope.addLog('Loaded inactive list');
+                }, function(error) {
+                    $scope.addLog('Failed to show list: ' + error.message);
                 });
             };
 
