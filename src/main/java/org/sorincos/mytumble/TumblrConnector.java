@@ -103,6 +103,73 @@ public class TumblrConnector extends AbstractVerticle {
         eb.<String>consumer("mytumble.tumblr.followblog").handler(this::followBlog);
         eb.<String>consumer("mytumble.tumblr.unfollowblog").handler(this::unfollowBlog);
         eb.<String>consumer("mytumble.tumblr.getconfigblog").handler(this::getConfigblog);
+
+        eb.<JsonArray>consumer("mytumble.tumblr2.loadfollowing").handler(this::loadFollowing);
+        // eb.<JsonArray>consumer("mytumble.tumblr2.loadfollowers").handler(this::loadFollowers);
+        // eb.<JsonArray>consumer("mytumble.tumblr2.loaddetails").handler(this::loadDetails);
+    }
+
+    private void loadFollowing(Message<JsonArray> msg) {
+        try {
+            vertx.eventBus().send("mytumble.web.status", "loaaaaadin");
+            Map<String, JsonObject> followers = new HashMap<>();
+            loopFollowing(followers, 0);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            msg.fail(1, ex.getLocalizedMessage());
+            vertx.eventBus().send("mytumble.web.status", "Refresh failed: " + ex.getLocalizedMessage());
+            return;
+        }
+        vertx.eventBus().send("mytumble.web.status", "Done refreshing users");
+        JsonArray users = new JsonArray();
+        msg.reply(users);
+    }
+
+    private void loopFollowing(Map<String, JsonObject> mapUsers, int offset) {
+        JumblrClient client = vertx.getOrCreateContext().get("jumblrclient");
+        if (client == null) {
+            logger.error("Error: Jumblr not initialized");
+            return;
+        }
+        Map<String, String> options = new HashMap<String, String>();
+        long now = new Date().getTime();
+        vertx.setTimer(1000, t -> {
+            options.put("offset", Integer.toString(offset));
+            List<Blog> blogs = new ArrayList<>();
+            try {
+                blogs = client.userFollowing(options); // blogs I follow
+            } catch (Exception e) {
+                logger.info("Error loading blogs I follow: " + e.getLocalizedMessage());
+                try {
+                    blogs = client.userFollowing(options);
+                } catch (Exception e1) {
+                    logger.info("Error retrying loading blogs I follow: " + e.getLocalizedMessage());
+                    try {
+                        blogs = client.userFollowing(options);
+                    } catch (Exception e2) {
+                        logger.info("Giving up retrying loading blogs I follow: " + e.getLocalizedMessage());
+                    }
+                }
+            }
+            for (Blog blog : blogs) {
+                JsonObject jsonIfollow = new JsonObject();
+                jsonIfollow.put("_id", blog.getName());
+                jsonIfollow.put("name", blog.getName());
+                jsonIfollow.put("lastcheck", now); // who cares???
+                jsonIfollow.put("ifollow", true);
+                jsonIfollow.put("latest", blog.getUpdated()); // tumblr gives seconds
+                jsonIfollow.put("followsme", false);
+                mapUsers.put(blog.getName(), jsonIfollow);
+                SimpleDateFormat tumblrDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                logger.info("ifollow: " + mapUsers.size() + "/" + blog.getName() + "/"
+                        + tumblrDate.format(new Date(blog.getUpdated())));
+            }
+            if (blogs.isEmpty()) { // done with the blogs I follow
+                return;
+            }
+            loopUsers(mapUsers, offset + 10); // next 10 (small batches)
+        });
+        return;
     }
 
     private void lastPostsReacts(Message<JsonObject> msg) {
@@ -261,7 +328,7 @@ public class TumblrConnector extends AbstractVerticle {
     // SimpleDateFormat tumblrDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss 'GMT'");
     // OptionalLong latest = info.posts().stream().mapToLong(post -> {
     // try {
-    // return tumblrDate.parse(post.getDateGMT()).getTime();
+    // return tumblrDate.parse(post.getDateGMT()).getTime()/1000;
     // } catch (ParseException e) {
     // logger.error("Error parsing dateGMT for: " + jsonFollower.getString("name") + ": "
     // + post.getDateGMT());
@@ -438,9 +505,8 @@ public class TumblrConnector extends AbstractVerticle {
                     SimpleDateFormat tumblrDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss 'GMT'");
                     OptionalLong latest = info.posts().stream().mapToLong(post -> { // TODO gets the oldest??? undefined
                         try {
-                            // logger.error("---Parsing dateGMT for: " + user + ": "
-                            // + tumblrDate.parse(post.getDateGMT()).getTime());
-                            return tumblrDate.parse(post.getDateGMT()).getTime();
+                            // logger.info("---Parsing dateGMT for: " + user + ": " + post.getDateGMT());
+                            return tumblrDate.parse(post.getDateGMT()).getTime(); // only seconds plz
                         } catch (ParseException e) {
                             logger.error("Error parsing dateGMT for: " + user + ": " + post.getDateGMT());
                             return 0;
